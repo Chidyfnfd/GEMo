@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEMo (Gestor Emocional)</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de fuentes Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f7fafc; }
+        .tab-button { transition: all 0.2s; }
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 0 3px #fff;
+        }
+        .range-slider { -webkit-appearance: none; appearance: none; }
+        .stress { background-color: #fee2e2; border-left-color: #ef4444; } /* bg-red-100 */
+        .calm { background-color: #d1fae5; border-left-color: #10b981; } /* bg-green-100 */
+    </style>
+</head>
+<body class="min-h-screen bg-gray-50">
+
+    <div id="app" class="p-4 sm:p-8 max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-gray-900 leading-tight">
+                GEMo <span class="text-blue-600">(Gestor Emocional)</span>
+            </h1>
+            <p class="text-md text-gray-500 mt-1">
+                Tu gestor emocional privado y seguro (ID: <span id="user-id" class="font-mono text-xs bg-gray-200 p-1 rounded">Cargando...</span>)
+            </p>
+        </header>
+
+        <!-- Navegación por Pestañas -->
+        <div class="flex justify-center mb-8 space-x-2 sm:space-x-4" id="tabs-container">
+            <!-- Botones de pestañas se renderizan aquí -->
+        </div>
+
+        <main id="main-content">
+            <!-- Contenido de las pestañas (Formulario, Reporte, Historial) se renderiza aquí -->
+            <div id="loading-screen" class="flex flex-col items-center justify-center min-h-[300px] text-center p-6">
+                <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="mt-4 text-gray-700 ml-3">Iniciando sesión y cargando datos...</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Script de Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, onSnapshot, collection, query, addDoc, serverTimestamp, setLogLevel, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Establecer nivel de log de Firestore a Debug (recomendado)
+        // setLogLevel('Debug'); // Deshabilitado porque Firebase no está importado
+
+        // Función helper para crear fechas de prototipo
+        const mockDate = (daysAgo) => {
+            const date = new Date();
+            date.setDate(date.getDate() - daysAgo);
+            return date;
+        };
+
+        const state = {
+            db: null,
+            auth: null,
+            userId: null,
+            // --- DATOS DE PROTOTIPO ---
+            entries: [
+                { id: 'm1', date: mockDate(1).toISOString().split('T')[0], emotionLevel: 8, emotionName: 'Estrés', habit: 'Proyecto de trabajo', timestamp: mockDate(1) },
+                { id: 'm2', date: mockDate(2).toISOString().split('T')[0], emotionLevel: 4, emotionName: 'Calma', habit: 'Meditación', timestamp: mockDate(2) },
+                { id: 'm3', date: mockDate(3).toISOString().split('T')[0], emotionLevel: 7, emotionName: 'Ansiedad', habit: 'Noticias', timestamp: mockDate(3) },
+                { id: 'm4', date: mockDate(4).toISOString().split('T')[0], emotionLevel: 6, emotionName: 'Frustración', habit: 'Tráfico', timestamp: mockDate(4) },
+                { id: 'm5', date: mockDate(5).toISOString().split('T')[0], emotionLevel: 3, emotionName: 'Alegría', habit: 'Socializar', timestamp: mockDate(5) },
+                { id: 'm6', date: mockDate(6).toISOString().split('T')[0], emotionLevel: 5, emotionName: 'Calma', habit: 'Leer', timestamp: mockDate(6) },
+                { id: 'm7', date: mockDate(7).toISOString().split('T')[0], emotionLevel: 8, emotionName: 'Estrés', habit: 'Finanzas', timestamp: mockDate(7) },
+            ], 
+            // --- FIN DATOS DE PROTOTIPO ---
+            loading: true,
+            activeTab: 'register', 
+            minEntriesForReport: 7,
+            emotionOptions: ['Estrés', 'Ansiedad', 'Frustración', 'Calma', 'Alegría'],
+            habitOptions: ['Ejercicio', 'Trabajo', 'Descanso', 'Socializar', 'Meditación', 'Dieta'],
+        };
+
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        let firebaseConfig = {};
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        } catch (e) {
+            console.error("Error al parsear __firebase_config:", e);
+        }
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        /**
+         * Muestra un mensaje de error crítico en la UI.
+         */
+        function displayCriticalError(message) {
+            document.getElementById('main-content').innerHTML = `
+                <div class="text-center p-10 bg-red-50 rounded-xl shadow-lg border border-red-400 mt-8 max-w-lg mx-auto">
+                    <svg class="w-12 h-12 text-red-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h3 class="text-xl font-semibold text-red-800">Error Crítico</h3>
+                    <p class="text-red-600 mt-2 font-mono text-sm">${message}</p>
+                    <p class="text-xs text-red-500 mt-4">Reinicie la aplicación para reintentar la conexión.</p>
+                </div>
+            `;
+            // Limpiar la visualización de la ID de usuario
+            document.getElementById('user-id').textContent = 'FALLO';
+        }
+
+        /**
+         * Obtiene la referencia a la colección 'entries' del usuario.
+         * Ruta: /artifacts/{__app_id}/users/{userId}/entries
+         */
+        function getEntriesCollectionRef(uid) {
+            if (!state.db) return null;
+            return collection(state.db, `artifacts/${appId}/users/${uid}/entries`);
+        }
+
+        /**
+         * Inicializa Firebase, autentica y configura el listener de Firestore.
+         */
+        async function initFirebase() {
+            // --- MODO PROTOTIPO OFFLINE ---
+            console.log("Modo Prototipo: Firebase deshabilitado.");
+            try {
+                // 1. Simular la carga del usuario
+                state.userId = "usuario-prototipo-123";
+                document.getElementById('user-id').textContent = state.userId;
+                
+                // 2. Simular la carga de datos (ya están en state.entries)
+                // No es necesario llamar a listenForEntries()
+                
+                // 3. Quitar el spinner y renderizar
+                state.loading = false;
+                renderUI();
+
+            } catch (e) {
+                console.error("Error en initFirebase (modo prototipo):", e);
+                displayCriticalError("Error al iniciar el prototipo.");
+            }
+            // --- FIN MODO PROTOTIPO ---
+            
+            /* --- CÓDIGO ORIGINAL DE FIREBASE (DESHABILITADO) ---
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("La configuración de Firebase está ausente o es inválida.");
+                }
+
+                const app = initializeApp(firebaseConfig);
+                state.auth = getAuth(app);
+                state.db = getFirestore(app);
+
+                // Persistencia (para que el ID anónimo se mantenga)
+                await setPersistence(state.auth, browserSessionPersistence);
+
+
+                // Habilitar persistencia de Firestore (Offline)
+                try {
+                    await enableIndexedDbPersistence(state.db);
+                    console.log("Persistencia de Firestore (IndexedDB) habilitada para modo offline.");
+                } catch (err) {
+                    if (err.code == 'failed-precondition') {
+                        console.warn("GEMo: No se pudo habilitar la persistencia. Múltiples pestañas están abiertas. El modo offline funcionará solo en esta pestaña.");
+                    } else if (err.code == 'unimplemented') {
+                        console.warn("GEMo: El navegador no soporta la persistencia offline (ej. modo incógnito).");
+                    }
+                }
+
+
+                // Autenticación
+                const signIn = async () => {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(state.auth, initialAuthToken);
+                    } else {
+                        // Genera un ID anónimo para el usuario si no hay token
+                        await signInAnonymously(state.auth);
+                    }
+                };
+
+                // Listener de estado de autenticación
+                onAuthStateChanged(state.auth, (user) => {
+                    if (user) {
+                        state.userId = user.uid;
+                        document.getElementById('user-id').textContent = user.uid;
+                        listenForEntries(user.uid);
+                    } else {
+                        state.userId = null;
+                        signIn(); // Forzar inicio de sesión (anónimo o con token)
+                    }
+                    state.loading = false;
+                    renderUI(); // Renderizar después de la autenticación
+                });
+
+                // Si no hay un usuario inicial, forzar el proceso de inicio de sesión.
+                if (!state.auth.currentUser) {
+                    await signIn();
+                }
+
+            } catch (e) {
+                console.error("Firebase Initialization Error:", e);
+                state.loading = false; // Detener el spinner
+                
+                let message = e.message || "Error desconocido al conectar con Firebase.";
+                if (message.includes("config")) {
+                    message = "La configuración de Firebase no se pudo inicializar. Credenciales faltantes.";
+                } else if (message.includes("auth")) {
+                    message = "Error en la autenticación. El token o las reglas de seguridad podrían ser el problema.";
+                }
+                displayCriticalError(message);
+            }
+            */
+        }
+
+        /**
+         * Configura el listener de tiempo real para los registros del usuario.
+         */
+        function listenForEntries(uid) {
+            /* --- MODO PROTOTIPO: No se necesita listener en tiempo real ---
+            const entriesRef = getEntriesCollectionRef(uid);
+            if (!entriesRef) return;
+
+            // Nota: Se omite orderBy('timestamp', 'desc') para evitar errores de índice en Firestore.
+            // La ordenación se hará en el cliente.
+            const q = query(entriesRef);
+
+            onSnapshot(q, (snapshot) => {
+                state.entries = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    // Convertir el timestamp de Firestore a Date
+                    timestamp: doc.data().timestamp ? doc.data().timestamp.toDate() : new Date(),
+                }));
+                
+                // Ordenar en el cliente
+                state.entries.sort((a, b) => b.timestamp - a.timestamp);
+
+                // Forzar re-renderizado de la UI cuando los datos cambian
+                renderUI();
+            }, (error) => {
+                console.error("Error loading entries:", error);
+            });
+            */
+        }
+
+        /**
+         * Agrega un nuevo registro emocional.
+         */
+        async function addEntry(newEntry) {
+            // --- MODO PROTOTIPO: Añadir al array local ---
+            try {
+                console.log("Modo Prototipo: Guardando entrada localmente", newEntry);
+                // Asignar un ID de prototipo
+                newEntry.id = `proto_${crypto.randomUUID()}`;
+                
+                // Añadir al principio del array (simulando el orden descendente)
+                state.entries.unshift(newEntry);
+                
+                // NO es necesario llamar a renderUI() aquí,
+                // el 'onsubmit' lo hará después de mostrar el feedback.
+                // Pero si lo necesitáramos, lo llamaríamos.
+                // renderUI(); 
+
+                // Devolver una promesa resuelta para que el 'try/catch' en onsubmit funcione
+                return Promise.resolve();
+
+            } catch (e) {
+                console.error("Error en addEntry (prototipo)", e);
+                return Promise.reject(e);
+            }
+            // --- FIN MODO PROTOTIPO ---
+
+            /* --- CÓDIGO ORIGINAL DE FIREBASE (DESHABILITADO) ---
+            if (!state.db || !state.userId) {
+                throw new Error("Base de datos o ID de usuario no disponible.");
+            }
+            const entriesRef = getEntriesCollectionRef(state.userId);
+            if (!entriesRef) {
+                throw new Error("Referencia de colección no válida.");
+            }
+            // Agregamos un chequeo de ID para evitar grabar si es el ID de fallo
+            if (state.userId === 'FALLO') {
+                 throw new Error("No se puede guardar: ID de usuario inválida.");
+            }
+            await addDoc(entriesRef, newEntry);
+            */
+        }
+
+        // --- 3. LÓGICA DE DATOS Y REPORTES ---
+
+        /**
+         * Procesa los datos de las entradas para generar la gráfica y el promedio semanal.
+         */
+        function processReportData() {
+            // Usamos las entradas ya ordenadas por el listener
+            const sortedEntries = state.entries;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dateMap = new Map();
+
+            // Llenar el mapa con 7 días hacia atrás
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const isoDate = d.toISOString().split('T')[0];
+                dateMap.set(isoDate, { date: isoDate, levels: [], peakDay: false, highLevelEntries: [] });
+            }
+
+            // Procesar registros
+            sortedEntries.forEach(entry => {
+                const entryDate = entry.date;
+                if (dateMap.has(entryDate)) {
+                    dateMap.get(entryDate).levels.push(entry.emotionLevel);
+                    if (['Estrés', 'Ansiedad'].includes(entry.emotionName) && entry.emotionLevel >= 7) {
+                        dateMap.get(entryDate).highLevelEntries.push(entry);
+                    }
+                }
+            });
+
+            let totalStressAnxietyLevel = 0;
+            let stressAnxietyCount = 0;
+            let maxPeakLevel = 0;
+            let overallPeakEntry = null;
+
+            const dataArray = Array.from(dateMap.values()).map(day => {
+                const avgLevel = day.levels.length > 0
+                    ? day.levels.reduce((sum, level) => sum + level, 0) / day.levels.length
+                    : 5; // Default a 5 si no hay datos
+
+                day.highLevelEntries.forEach(entry => {
+                    totalStressAnxietyLevel += entry.emotionLevel;
+                    stressAnxietyCount++;
+                    if (entry.emotionLevel > maxPeakLevel) {
+                        maxPeakLevel = entry.emotionLevel;
+                        overallPeakEntry = entry;
+                    }
+                });
+
+                return {
+                    ...day,
+                    avgLevel: parseFloat(avgLevel.toFixed(1)),
+                };
+            });
+
+            const avgStress = stressAnxietyCount > 0
+                ? totalStressAnxietyLevel / stressAnxietyCount
+                : 0;
+
+            // Marcar el día pico en la dataArray
+            if (overallPeakEntry) {
+                const peakDayIndex = dataArray.findIndex(d => d.date === overallPeakEntry.date);
+                if (peakDayIndex !== -1) {
+                    dataArray[peakDayIndex].peakDay = true;
+                }
+            }
+
+            return {
+                chartData: dataArray,
+                weeklyStressAvg: parseFloat(avgStress.toFixed(1)),
+                peakEntry: overallPeakEntry,
+                showReport: state.entries.length >= state.minEntriesForReport,
+            };
+        }
+
+        // --- 4. FUNCIONES DE RENDERIZADO DE LA UI ---
+
+        function renderTabs(showReport) {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = `
+                <button data-tab="register" class="tab-button px-6 py-3 font-semibold rounded-lg shadow-md ${
+                    state.activeTab === 'register' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-blue-50'
+                }">
+                    ${state.entries.length === 0 ? 'Primer Registro' : 'Nuevo Registro'}
+                </button>
+                <button data-tab="report" ${!showReport ? 'disabled' : ''} class="tab-button px-6 py-3 font-semibold rounded-lg shadow-md ${
+                    state.activeTab === 'report' && showReport
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed'
+                }">
+                    Reporte Semanal ${showReport ? `(${state.entries.length} Registros)` : '(Mín. 7 Entradas)'}
+                </button>
+                <button data-tab="history" class="tab-button px-6 py-3 font-semibold rounded-lg shadow-md ${
+                    state.activeTab === 'history' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-blue-50'
+                }">
+                    Historial
+                </button>
+            `;
+
+            container.querySelectorAll('.tab-button').forEach(button => {
+                button.onclick = () => {
+                    state.activeTab = button.dataset.tab;
+                    renderUI();
+                };
+            });
+        }
+
+        /**
+         * Renders the Registration Form (Pestaña de Registro).
+         */
+        function renderRegistrationForm() {
+            const defaultEmotion = 'Calma';
+            let emotionLevel = 5;
+            let emotionName = defaultEmotion;
+            
+            // Si el ID es nulo o de fallo, mostrar mensaje de error en el formulario
+            if (!state.userId || state.userId === 'FALLO') {
+                document.getElementById('main-content').innerHTML = `
+                    <div class="text-center p-10 bg-yellow-100 rounded-xl shadow-lg border border-yellow-400 mt-8 max-w-lg mx-auto">
+                        <svg class="w-12 h-12 text-yellow-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.398 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <h3 class="text-xl font-semibold text-yellow-800">Conexión Pendiente</h3>
+                        <p class="text-yellow-700 mt-2">
+                            La aplicación está intentando obtener tu ID de usuario. Si este mensaje persiste, significa que la inicialización de Firebase falló.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+
+            const formHtml = `
+                <div class="bg-white p-6 md:p-8 rounded-xl shadow-2xl border-t-4 border-blue-500 w-full max-w-md mx-auto">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Registro Rápido (<span id="level-display">5</span>/10)
+                    </h2>
+
+                    <form id="registration-form" class="space-y-5">
+                        <!-- Selector de Nivel Emocional (Slider) -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Intensidad Emocional: <span id="level-value" class="font-extrabold text-green-500">5</span>
+                            </label>
+                            <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                value="5"
+                                id="emotion-level-slider"
+                                class="w-full h-2 bg-gray-200 rounded-lg range-slider transition duration-300"
+                                required
+                            />
+                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>1 (Bajo)</span>
+                                <span>10 (Intenso)</span>
+                            </div>
+                        </div>
+
+                        <!-- Selector de Nombre de Emoción -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Emoción Principal
+                            </label>
+                            <div class="flex flex-wrap gap-2" id="emotion-buttons">
+                                ${state.emotionOptions.map(name => `
+                                    <button
+                                        key="${name}"
+                                        type="button"
+                                        data-emotion="${name}"
+                                        class="px-4 py-2 text-sm font-semibold rounded-full transition duration-200 ease-in-out ${
+                                            name === defaultEmotion
+                                                ? 'bg-blue-600 text-white shadow-md transform scale-105'
+                                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                        }"
+                                    >
+                                        ${name}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <!-- Campo de Hábito/Actividad -->
+                        <div>
+                            <label for="habit" class="block text-sm font-medium text-gray-700 mb-2">
+                                Hábito/Actividad de Hoy (Opcional)
+                            </label>
+                            <input
+                                type="text"
+                                id="habit-input"
+                                placeholder="Ej: Trabajé 8h, Hice ejercicio, Dormí 7h"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                                list="habit-suggestions"
+                            />
+                            <datalist id="habit-suggestions">
+                                ${state.habitOptions.map(option => `<option value="${option}" />`).join('')}
+                            </datalist>
+                        </div>
+
+                        <!-- Botón de Guardar -->
+                        <button
+                            type="submit"
+                            id="save-button"
+                            class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-xl text-lg font-bold text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-opacity-50 transition duration-300 transform hover:scale-[1.01]"
+                        >
+                            Guardar Emoción
+                            <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-9.618 4.04A11.955 11.955 0 0012 21a11.955 11.955 0 009.618-14.016z"></path></svg>
+                        </button>
+
+                        <!-- Mensaje de Feedback -->
+                        <p id="feedback-message" class="text-center font-semibold text-sm mt-3 invisible"></p>
+                    </form>
+                </div>
+            `;
+            document.getElementById('main-content').innerHTML = formHtml;
+
+            const slider = document.getElementById('emotion-level-slider');
+            const levelValueSpan = document.getElementById('level-value');
+            const levelDisplaySpan = document.getElementById('level-display');
+            const emotionButtons = document.getElementById('emotion-buttons');
+            const saveButton = document.getElementById('save-button');
+            const feedbackMessage = document.getElementById('feedback-message');
+            const form = document.getElementById('registration-form');
+
+            // Actualizar color y valor del slider
+            const updateSliderUI = (level) => {
+                const color = level >= 7 ? '#ef4444' : '#10b981';
+                levelValueSpan.textContent = level;
+                levelDisplaySpan.textContent = level;
+                levelValueSpan.className = `font-extrabold ${level >= 7 ? 'text-red-500' : 'text-green-500'}`;
+                slider.style.accentColor = color;
+                emotionLevel = parseInt(level);
+            };
+
+            // Event listener para el slider
+            slider.oninput = (e) => updateSliderUI(e.target.value);
+            updateSliderUI(slider.value); // Inicializar UI
+
+            // Event listener para los botones de emoción
+            emotionButtons.querySelectorAll('button').forEach(button => {
+                button.onclick = (e) => {
+                    // Deseleccionar todos
+                    emotionButtons.querySelectorAll('button').forEach(btn => {
+                        btn.className = 'px-4 py-2 text-sm font-semibold rounded-full transition duration-200 ease-in-out bg-blue-100 text-blue-700 hover:bg-blue-200';
+                    });
+                    // Seleccionar el actual
+                    e.currentTarget.className = 'px-4 py-2 text-sm font-semibold rounded-full transition duration-200 ease-in-out bg-blue-600 text-white shadow-md transform scale-105';
+                    emotionName = e.currentTarget.dataset.emotion;
+                };
+            });
+
+            // Event listener para el formulario
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                saveButton.disabled = true;
+                saveButton.innerHTML = 'Guardando...';
+                
+                const habitInput = document.getElementById('habit-input').value;
+
+                const newEntry = {
+                    userId: state.userId,
+                    date: new Date().toISOString().split('T')[0],
+                    emotionLevel: emotionLevel,
+                    emotionName: emotionName,
+                    habit: habitInput || 'Sin Hábito Registrado',
+                    // timestamp: serverTimestamp(), // Original
+                    timestamp: new Date(), // CAMBIO PARA PROTOTIPO
+                };
+
+                try {
+                    await addEntry(newEntry);
+                    // Éxito
+                    feedbackMessage.textContent = '✅ Registro guardado rápidamente. ¡Bien hecho!';
+                    feedbackMessage.className = 'text-center font-semibold text-sm mt-3 text-green-600';
+                    feedbackMessage.classList.remove('invisible');
+
+                    // Resetear formulario para usabilidad rápida
+                    slider.value = 5;
+                    updateSliderUI(5);
+                    emotionName = defaultEmotion;
+                    document.getElementById('habit-input').value = '';
+                    emotionButtons.querySelectorAll(`[data-emotion]`).forEach(btn => {
+                        btn.className = `px-4 py-2 text-sm font-semibold rounded-full transition duration-200 ease-in-out ${
+                            btn.dataset.emotion === defaultEmotion
+                                ? 'bg-blue-600 text-white shadow-md transform scale-105'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        }`;
+                    });
+                    
+                    // --- MODO PROTOTIPO: Forzar re-renderizado ---
+                    // Como el listener de onSnapshot está apagado,
+                    // debemos redibujar la UI manualmente después de agregar.
+                    renderUI();
+                    // --- FIN PROTOTIPO ---
+
+                } catch (error) {
+                    console.error('Error al guardar en Firestore:', error);
+                    feedbackMessage.textContent = '❌ Error al guardar el registro. Intenta de nuevo. (Revisa la conexión)';
+                    feedbackMessage.className = 'text-center font-semibold text-sm mt-3 text-red-600';
+                    feedbackMessage.classList.remove('invisible');
+                } finally {
+                    saveButton.disabled = false;
+                    saveButton.innerHTML = 'Guardar Emoción <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-9.618 4.04A11.955 11.955 0 0012 21a11.955 11.955 0 009.618-14.016z"></path></svg>';
+                    setTimeout(() => feedbackMessage.classList.add('invisible'), 3000);
+                }
+            };
+        }
+
+        /**
+         * Renders the Report Tab (Pestaña de Reporte).
+         */
+        function renderReportTab(data) {
+            const { chartData, weeklyStressAvg, peakEntry, showReport } = data;
+
+            if (!showReport) {
+                // Mensaje de usuario sin reporte
+                document.getElementById('main-content').innerHTML = `
+                    <div class="text-center p-10 bg-yellow-50 rounded-xl shadow-lg border border-yellow-200 mt-8 max-w-lg mx-auto">
+                        <svg class="w-12 h-12 text-yellow-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800">Casi Listo para Reportes</h3>
+                        <p class="text-gray-600 mt-2">
+                            Necesitas al menos <span class="font-bold">${state.minEntriesForReport} registros</span> para poder generar tu Reporte Semanal. Llevas ${state.entries.length} registros. ¡Sigue adelante!
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Generar HTML principal del reporte
+            let reportHtml = `
+                <div class="bg-white p-6 rounded-xl shadow-2xl border-t-4 border-emerald-500 mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-4 flex items-center">
+                        <svg class="w-7 h-7 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        Tendencia Emocional Semanal
+                    </h2>
+                    <p class="text-gray-500 mb-4">
+                        Visualización de tu Nivel Emocional Promedio diario (Últimos 7 días).
+                    </p>
+
+                    <div class="flex items-center space-x-4 mb-6">
+                        <label class="text-sm font-medium text-gray-700">Rango de Fechas:</label>
+                        <select class="p-2 border border-gray-300 rounded-lg text-sm bg-white shadow-sm">
+                            <option>Última Semana (Por Defecto)</option>
+                            <option disabled>Último Mes (Simulado)</option>
+                            <option disabled>Personalizado (Simulado)</option>
+                        </select>
+                    </div>
+
+                    <!-- Contenedor del Gráfico SVG -->
+                    <div id="line-chart-container" class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-100">
+                        ${renderLineChartSVG(chartData, peakEntry)}
+                    </div>
+
+                    ${peakEntry ? `
+                        <p class="mt-2 text-sm text-center">
+                            <span class="font-semibold text-red-500">Pico de Estrés/Ansiedad:</span>
+                            ${peakEntry.emotionName} (Nivel ${peakEntry.emotionLevel}) el
+                            ${new Date(peakEntry.date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}.
+                        </p>
+                    ` : ''}
+
+                    <!-- Estadísticas Clave -->
+                    <div class="grid grid-cols-2 gap-4 mt-6 text-center">
+                        <div class="p-3 rounded-xl bg-blue-50 border border-blue-200">
+                            <p class="text-3xl font-bold text-blue-600">${chartData.length}</p>
+                            <p class="text-sm text-blue-500">Días en Reporte</p>
+                        </div>
+                        <div class="p-3 rounded-xl ${weeklyStressAvg > 7 ? 'bg-red-100 border-red-300' : 'bg-green-100 border-green-300'}">
+                            <p class="text-3xl font-bold text-gray-800">${weeklyStressAvg || 'N/A'}</p>
+                            <p class="text-sm text-gray-600">Promedio Estrés/Ansiedad</D>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // Agregar recomendaciones
+            reportHtml += renderRecommendations(weeklyStressAvg);
+
+            document.getElementById('main-content').innerHTML = reportHtml;
+        }
+
+        /**
+         * Renders the Line Chart SVG (Simulación de Gráfico).
+         */
+        function renderLineChartSVG(data, peakEntry) {
+            const width = 600;
+            const height = 200;
+            const margin = 20;
+            const textMargin = 10; // Espacio para etiquetas de fecha
+
+            if (!data || data.length === 0) {
+                return '<div class="text-center py-8 text-gray-500">No hay datos suficientes para el gráfico.</div>';
+            }
+
+            const maxLevel = 10;
+            const minLevel = 1;
+            const xStep = (width - 2 * margin) / (data.length - 1);
+            const yScale = (level) => height - margin - textMargin - ((level - minLevel) / (maxLevel - minLevel)) * (height - 2 * margin - textMargin);
+
+            const points = data.map((d, i) => {
+                const x = margin + i * xStep;
+                const y = yScale(d.avgLevel);
+                return `${x},${y}`;
+            }).join(' ');
+
+            let svgHtml = `
+                <svg width="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="font-family: 'Inter', sans-serif;">
+                    <!-- Ejes Y y etiquetas -->
+                    <line x1="${margin}" y1="${yScale(10)}" x2="${width - margin}" y2="${yScale(10)}" stroke="#fca5a5" stroke-dasharray="4"/>
+                    <text x="${margin}" y="${yScale(10) - 5}" fill="#ef4444" font-size="10" font-weight="600">10 (Alto)</text>
+                    
+                    <line x1="${margin}" y1="${yScale(5)}" x2="${width - margin}" y2="${yScale(5)}" stroke="#9ca3af" stroke-dasharray="4"/>
+                    <text x="${margin}" y="${yScale(5) - 5}" fill="#6b7280" font-size="10">5 (Medio)</text>
+
+                    <line x1="${margin}" y1="${yScale(1)}" x2="${width - margin}" y2="${yScale(1)}" stroke="#a7f3d0" stroke-dasharray="4"/>
+                    <text x="${margin}" y="${yScale(1) - 5}" fill="#10b981" font-size="10">1 (Bajo)</text>
+
+                    <!-- Línea principal del gráfico -->
+                    <polyline points="${points}" fill="none" stroke="#3b82f6" stroke-width="2.5" />
+
+                    <!-- Puntos y Etiquetas X -->
+                    ${data.map((d, i) => {
+                        const x = margin + i * xStep;
+                        const y = yScale(d.avgLevel);
+                        const isPeak = d.peakDay;
+                        const dateLabel = new Date(d.date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+
+                        return `
+                            <circle cx="${x}" cy="${y}" r="${isPeak ? 6 : 4}" fill="${isPeak ? '#ef4444' : '#3b82f6'}" stroke="#fff" stroke-width="1.5" />
+                            <text x="${x}" y="${height - (margin / 2)}" text-anchor="middle" font-size="10" fill="#6b7280">${dateLabel}</text>
+                        `;
+                    }).join('')}
+                </svg>
+            `;
+            return svgHtml;
+        }
+
+        /**
+         * Renders Recommendations based on stress level.
+         */
+        function renderRecommendations(avg) {
+            let title, icon, advice;
+
+            if (avg === 0) {
+                 title = "Aún sin datos de Estrés/Ansiedad";
+                 icon = `<svg class="w-10 h-10 text-gray-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                 advice = "Registra tus momentos de estrés (nivel 7+) para que GEMo pueda identificar patrones.";
+            } else if (avg >= 7.0) {
+                title = "Foco: Manejo del Estrés";
+                icon = `<svg class="w-10 h-10 text-red-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                advice = "Tu nivel promedio de estrés/ansiedad es alto. Prioriza el descanso, considera técnicas de respiración y limita la cafeína. Identifica qué hábitos se asocian a tus picos.";
+            } else if (avg >= 4.0) {
+                title = "Balance Emocional Moderado";
+                icon = `<svg class="w-10 h-10 text-yellow-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>`;
+                advice = "Estás manejando las cosas, pero hay picos de estrés. Revisa qué actividades (como 'Ejercicio' o 'Meditación') te ayudan a mantenerte en calma esos días.";
+            } else {
+                title = "Excelente Gestión de la Calma";
+                icon = `<svg class="w-10 h-10 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 19m7-9V5a2 2 0 00-2-2h-.085a2 2 0 00-1.915 1.915L11 5m7 5h-1m-6-5H7m2 10v5m5-10V5"></path></svg>`;
+                advice = "¡Felicidades! Tus niveles de estrés reportados son bajos. Sigue así. Revisa tus hábitos de los días de 'Calma' para reforzarlos.";
+            }
+
+            return `
+                <div class="bg-white p-6 rounded-xl shadow-2xl border-t-4 border-gray-300">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">
+                        ${title}
+                    </h3>
+                    <div class="text-center">
+                        ${icon}
+                        <p class="text-gray-600 mt-4 px-4">${advice}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
+        /**
+         * Renders the History Tab (Pestaña de Historial).
+         */
+        function renderHistoryTab() {
+            if (state.entries.length === 0) {
+                document.getElementById('main-content').innerHTML = `
+                    <div class="text-center p-10 bg-blue-50 rounded-xl shadow-lg border border-blue-200 mt-8 max-w-lg mx-auto">
+                        <svg class="w-12 h-12 text-blue-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <h3 class="text-xl font-semibold text-gray-800">Sin Registros</h3>
+                        <p class="text-gray-600 mt-2">
+                            Aún no has guardado ninguna emoción. Ve a la pestaña 'Nuevo Registro' para empezar.
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            const historyHtml = `
+                <div class="bg-white p-6 rounded-xl shadow-2xl border-t-4 border-gray-500">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6">Historial de Registros</h2>
+                    <ul class="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+                        ${state.entries.map(entry => `
+                            <li class="p-4 rounded-lg shadow-md border-l-4 ${entry.emotionLevel >= 7 ? 'stress' : 'calm'}">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-lg font-bold ${entry.emotionLevel >= 7 ? 'text-red-700' : 'text-green-700'}">
+                                        ${entry.emotionName} (Nivel ${entry.emotionLevel}/10)
+                                    </span>
+                                    <span class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                        ${formatDate(entry.timestamp)}
+                                    </span>
+                                </div>
+                                <p class="text-sm text-gray-600">
+                                    <strong>Hábito:</strong> ${entry.habit || 'N/A'}
+                                </p>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+            document.getElementById('main-content').innerHTML = historyHtml;
+        }
+
+        /**
+         * Helper to format dates nicely.
+         */
+        function formatDate(date) {
+            if (!date) return 'Fecha desconocida';
+            // Formato: 25 oct, 10:30 AM
+            return date.toLocaleDateString('es-ES', {
+                day: 'numeric',
+                month: 'short',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        }
+
+        /**
+         * Renders the main UI based on the current state (Router).
+         */
+        function renderUI() {
+            if (state.loading) {
+                // El spinner de carga ya está visible por defecto
+                return;
+            }
+
+            const reportData = processReportData();
+            renderTabs(reportData.showReport);
+
+            switch (state.activeTab) {
+                case 'register':
+                    renderRegistrationForm();
+                    break;
+                case 'report':
+                    renderReportTab(reportData);
+                    break;
+                case 'history':
+                    renderHistoryTab();
+                    break;
+                default:
+                    renderRegistrationForm();
+            }
+        }
+
+        // --- 5. INICIALIZACIÓN ---
+        window.onload = initFirebase;
+
+    </script>
+</body>
+</html>
