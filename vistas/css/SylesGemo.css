@@ -1,0 +1,9 @@
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+    height: 8px;
+    border-radius: 4px;
+    background: #e5e7eb;
+}

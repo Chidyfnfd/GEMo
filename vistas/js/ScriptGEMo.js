@@ -1,0 +1,1236 @@
+ // --- Constantes y Simulación de Base de Datos ---
+        const APP_PREFIX = 'gemo_v13_'; // Incrementamos versión para un nuevo caché
+        const STORAGE_KEYS = {
+          USERS: `${APP_PREFIX}users`,
+          ENTRIES: `${APP_PREFIX}entries`,
+          ADVICES: `${APP_PREFIX}advices`,
+          CURRENT_USER: `${APP_PREFIX}currentUser`,
+          EMOTIONS_LIST: `${APP_PREFIX}emotionsList`,
+          HABITS_LIST: `${APP_PREFIX}habitsList`,
+          // Nuevas llaves
+          HELP_REQUESTS: `${APP_PREFIX}helpRequests`,
+          CHATS: `${APP_PREFIX}chats`
+        };
+
+        const INITIAL_USERS = [
+            { id: 1, email: 'admin@gemo.com', password: '123', type: 0 }, 
+            { id: 2, email: 'cliente1@mail.com', password: '123', type: 1 }, 
+            { id: 3, email: 'cliente2@mail.com', password: '123', type: 1 }
+        ];
+
+        const INITIAL_ENTRIES = [
+            { id: 101, userId: 2, date: '2025-11-24T10:00:00.000Z', emotionLevel: 8, emotionName: 'Estrés', habit: 'Trabajo', timestamp: 1732435200000 }, 
+            { id: 102, userId: 2, date: '2025-11-25T14:30:00.000Z', emotionLevel: 4, emotionName: 'Calma', habit: 'Meditar', timestamp: 1732525800000 }, 
+            { id: 103, userId: 2, date: '2025-11-28T09:15:00.000Z', emotionLevel: 9, emotionName: 'Ansiedad', habit: 'Trabajo', timestamp: 1732810500000 }, 
+            { id: 104, userId: 2, date: '2025-11-30T19:00:00.000Z', emotionLevel: 5, emotionName: 'Frustración', habit: 'Socializar', timestamp: 1733022000000 }, 
+            { id: 105, userId: 2, date: '2025-12-01T08:00:00.000Z', emotionLevel: 6, emotionName: 'Estrés', habit: 'Comer', timestamp: 1733097600000 }, 
+            { id: 106, userId: 2, date: '2025-12-02T10:45:00.000Z', emotionLevel: 7, emotionName: 'Frustración', habit: 'Tráfico', timestamp: 1733227500000 }, 
+            { id: 107, userId: 2, date: '2025-12-04T12:00:00.000Z', emotionLevel: 3, emotionName: 'Calma', habit: 'Meditar', timestamp: 1733390400000 }
+        ];
+
+        const DEFAULT_EMOTIONS = ["Estrés", "Ansiedad", "Frustración", "Calma", "Alegría", "Tristeza"];
+        const DEFAULT_HABITS = ["Ejercicio", "Trabajo", "Descanso", "Socializar", "Meditar", "Comer"];
+
+        // --- Hooks y Utilidades ---
+
+        const getFullISODate = () => new Date().toISOString(); 
+        
+        const formatDate = (isoString) => {
+            const date = new Date(isoString);
+            return date.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+        };
+
+        const formatTime = (isoString) => {
+            const date = new Date(isoString);
+            return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        function useStickyState(defaultValue, key) {
+          const [value, setValue] = React.useState(() => {
+            const stickyValue = window.localStorage.getItem(key);
+            if (stickyValue !== null) {
+                return JSON.parse(stickyValue);
+            }
+            return defaultValue;
+          });
+          React.useEffect(() => {
+            window.localStorage.setItem(key, JSON.stringify(value));
+          }, [key, value]);
+          return [value, setValue];
+        }
+
+        // --- Componentes de UI Generales ---
+
+        function AuthScreen({ onLogin, onRegister, error }) {
+          const [isRegistering, setIsRegistering] = React.useState(false);
+          const [email, setEmail] = React.useState('');
+          const [password, setPassword] = React.useState('');
+          const [confirmPass, setConfirmPass] = React.useState('');
+          const [uiError, setUiError] = React.useState(error);
+            
+          React.useEffect(() => {
+              setUiError(error);
+          }, [error]);
+
+          const handleSubmit = (e) => {
+            e.preventDefault();
+            setUiError('');
+            if (isRegistering) {
+                if (password !== confirmPass) {
+                    setUiError('Las contraseñas no coinciden.');
+                    return;
+                }
+                onRegister(email, password);
+            } else {
+                onLogin(email, password);
+            }
+          };
+
+          return (
+            <div className="min-h-screen flex items-center justify-center bg-cyan-50 p-4">
+              <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg transition-all duration-300">
+                <h1 className="text-3xl font-bold text-cyan-800 mb-2 text-center">GEMo</h1>
+                <p className="text-gray-500 text-center mb-6">
+                    {isRegistering ? 'Crea tu cuenta personal' : 'Gestión Emocional'}
+                </p>
+                
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full p-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="nombre@ejemplo.com" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Contraseña</label>
+                    <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="mt-1 w-full p-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="******" required />
+                  </div>
+                  
+                  {isRegistering && (
+                      <div className="animate-fade-in">
+                        <label className="block text-sm font-medium text-gray-700">Confirmar Contraseña</label>
+                        <input type="password" value={confirmPass} onChange={e=>setConfirmPass(e.target.value)} className="mt-1 w-full p-2 border rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="******" required />
+                      </div>
+                  )}
+
+                  {uiError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">{uiError}</p>}
+
+                  <button type="submit" className="w-full bg-cyan-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-cyan-700 transition shadow-md">
+                    {isRegistering ? 'Registrarse' : 'Iniciar Sesión'}
+                  </button>
+                </form>
+                
+                <div className="mt-6 text-center">
+                    <button 
+                        onClick={() => { 
+                            setIsRegistering(!isRegistering); 
+                            setEmail(''); setPassword(''); setConfirmPass(''); 
+                            setUiError(''); 
+                        }}
+                        className="text-cyan-700 text-sm hover:underline font-medium"
+                    >
+                        {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate aquí'}
+                    </button>
+                </div>
+
+                {!isRegistering && (
+                    <div className="mt-6 text-xs text-gray-400 bg-gray-100 p-3 rounded">
+                    <p><strong>Credenciales Demo:</strong></p>
+                    <p>Admin: admin@gemo.com / 123</p>
+                    <p>Cliente: cliente1@mail.com / 123</p>
+                    </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        function Header({ user, currentView, setView, onLogout }) {
+            const displayName = user.type === 0 ? 'Administrador' : `ID: ${user.id}`;
+            return (
+                <header className="bg-white shadow-sm p-4 sticky top-0 z-30">
+                <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-cyan-800">GEMo</h1>
+                        <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-1 rounded-full">{displayName}</span>
+                    </div>
+                    <nav className="flex items-center space-x-2">
+                    {user.type === 1 && (
+                        <>
+                        <button onClick={() => setView('register')} className={`px-3 py-2 rounded-lg text-sm ${currentView === 'register' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Registro</button>
+                        <button onClick={() => setView('reports')} className={`px-3 py-2 rounded-lg text-sm ${currentView === 'reports' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Mis Reportes</button>
+                        <button onClick={() => setView('help')} className={`px-3 py-2 rounded-lg text-sm ${currentView === 'help' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Ayuda Profesional</button>
+                        <button onClick={() => setView('settings')} className={`px-3 py-2 rounded-lg text-sm ${currentView === 'settings' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Ajustes</button>
+                        </>
+                    )}
+                    {user.type === 0 && (
+                        <button onClick={() => setView('admin_users')} className={`px-4 py-2 rounded-lg text-sm ${currentView === 'admin_users' ? 'bg-cyan-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>Gestión Admin</button>
+                    )}
+                    <button onClick={onLogout} className="ml-2 text-sm text-red-500 hover:text-red-700 font-medium border border-red-200 px-3 py-2 rounded-lg hover:bg-red-50">Salir</button>
+                    </nav>
+                </div>
+                </header>
+            );
+        }
+
+        // --- COMPONENTE CHAT ---
+        function ChatWindow({ requestId, currentUser, allChats, onSendMessage, isAdmin, onCloseChat, isArchived = false }) {
+            const [msgText, setMsgText] = React.useState('');
+            const chatRef = React.useRef(null);
+
+            // Filtrar mensajes de este request específico
+            const messages = allChats.filter(c => c.requestId === requestId);
+
+            React.useEffect(() => {
+                if (chatRef.current) {
+                    chatRef.current.scrollTop = chatRef.current.scrollHeight;
+                }
+            }, [messages]);
+
+            const handleSend = (e) => {
+                e.preventDefault();
+                if (!msgText.trim()) return;
+                onSendMessage(requestId, msgText);
+                setMsgText('');
+            };
+
+            return (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-lg flex flex-col h-96">
+                    <div className="bg-cyan-700 p-3 text-white font-bold text-sm flex justify-between items-center">
+                        <span>{isArchived ? 'Historial de Chat' : 'Chat en Vivo'}</span>
+                        {isAdmin && !isArchived && (
+                            <button 
+                                onClick={() => onCloseChat(requestId)} 
+                                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 text-xs rounded-full transition flex items-center gap-1"
+                                title="Finalizar Chat y Archivar"
+                            >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 0012 9V6m7.85 7.85A9 9 0 0112 21v-3m-7.85-7.85A9 9 0 006 12h3m-3.5 0h.01M15.5 12h.01M19.998 8.5L21 7m-1.39-1.39l-1.01 1.01M17 19.998L19 21m-1.39-1.39l-1.01 1.01"/></svg>
+                                Cerrar Chat
+                            </button>
+                        )}
+                        {isArchived && (
+                            <span className="text-xs bg-cyan-600/50 px-2 py-1 rounded-full">Archivado</span>
+                        )}
+                    </div>
+                    <div className="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-3" ref={chatRef}>
+                        {messages.length === 0 && (
+                            <p className="text-center text-gray-400 text-sm mt-4 italic">Inicio de la conversación...</p>
+                        )}
+                        {messages.map(msg => {
+                            const isMe = msg.senderId === currentUser.id;
+                            const senderName = isMe ? 'Yo' : (isAdmin ? `Cliente ${msg.senderId}` : 'Profesional');
+                            return (
+                                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[80%] rounded-lg p-3 text-sm shadow-sm ${
+                                        isMe ? 'bg-cyan-600 text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                                    }`}>
+                                        <p className={`text-[10px] font-bold mb-1 ${isMe ? 'text-cyan-200' : 'text-cyan-700'}`}>{senderName}</p>
+                                        <p>{msg.message}</p>
+                                        <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-cyan-100' : 'text-gray-400'}`}>
+                                            {formatTime(new Date(msg.timestamp))}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {!isArchived && (
+                        <form onSubmit={handleSend} className="p-3 bg-white border-t border-gray-200 flex gap-2">
+                            <input 
+                                type="text" 
+                                className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-cyan-500"
+                                placeholder="Escribe un mensaje..."
+                                value={msgText}
+                                onChange={e => setMsgText(e.target.value)}
+                            />
+                            <button type="submit" className="bg-cyan-600 text-white p-2 rounded-full hover:bg-cyan-700 transition">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                            </button>
+                        </form>
+                    )}
+                </div>
+            );
+        }
+
+
+        // --- VISTA ARCHIVADOS (ADMIN) ---
+        function ArchivedChatsView({ archivedRequests, users, entries, chats, currentUser }) {
+            const [selectedRequest, setSelectedRequest] = React.useState(null);
+
+            const clientsArchived = users.filter(user => 
+                archivedRequests.some(req => req.userId === user.id)
+            );
+
+            // Sincronizar selección al cambiar la lista
+            React.useEffect(() => {
+                if (archivedRequests.length > 0 && !selectedRequest) {
+                    setSelectedRequest(archivedRequests[0]);
+                } else if (selectedRequest && !archivedRequests.find(r => r.id === selectedRequest.id)) {
+                    // Si el chat seleccionado ya no existe (no debería pasar aquí)
+                    setSelectedRequest(archivedRequests.length > 0 ? archivedRequests[0] : null);
+                }
+            }, [archivedRequests]);
+
+            if (archivedRequests.length === 0) {
+                return (
+                    <div className="max-w-4xl mx-auto p-12 text-center text-gray-500">
+                        <div className="bg-white p-8 rounded-2xl shadow border border-gray-100">
+                            <h2 className="text-2xl font-bold mb-2">Historial de Chats Vacío</h2>
+                            <p>Los chats que finalices se mostrarán aquí.</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const currentClient = selectedRequest ? clientsArchived.find(c => c.id === selectedRequest.userId) : null;
+            const clientHistory = currentClient ? entries.filter(e => e.userId === currentClient.id) : [];
+
+            return (
+                <div className="max-w-5xl mx-auto space-y-4">
+                    <h3 className="text-xl font-bold text-gray-800">Chats Archivados ({archivedRequests.length})</h3>
+                    
+                    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col lg:flex-row">
+                        {/* Lista de Chats Archivados */}
+                        <div className="lg:w-1/3 border-r border-gray-100 p-4 max-h-[700px] overflow-y-auto">
+                            <h4 className="text-sm font-semibold text-gray-600 mb-3 border-b pb-2">Seleccionar Cliente:</h4>
+                            <ul className="space-y-2">
+                                {archivedRequests.map(req => {
+                                    const client = clientsArchived.find(c => c.id === req.userId);
+                                    const isActive = selectedRequest && selectedRequest.id === req.id;
+                                    return (
+                                        <li key={req.id}>
+                                            <button 
+                                                onClick={() => setSelectedRequest(req)}
+                                                className={`w-full text-left p-3 rounded-lg transition ${
+                                                    isActive 
+                                                    ? 'bg-cyan-600 text-white shadow-md' 
+                                                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                                }`}
+                                            >
+                                                <span className="font-bold text-sm">Cliente ID: {req.userId}</span>
+                                                <p className={`text-xs mt-0.5 ${isActive ? 'text-cyan-200' : 'text-gray-500'}`}>
+                                                    Archivado: {formatDate(new Date(req.timestamp).toISOString())}
+                                                </p>
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                        
+                        {/* Detalle del Chat y Historial */}
+                        <div className="lg:w-2/3 p-4 space-y-4">
+                            {selectedRequest && (
+                                <>
+                                    <h4 className="text-lg font-bold text-gray-800 border-b pb-2">Detalle de Conversación (Cliente ID: {currentClient.id})</h4>
+                                    
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <h5 className="font-semibold text-gray-700">Historial Emocional del Cliente:</h5>
+                                            <HistoryList entries={clientHistory} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <h5 className="font-semibold text-gray-700">Comentario Inicial:</h5>
+                                            <div className="bg-gray-50 p-3 rounded text-sm italic border border-gray-200">
+                                                "{selectedRequest.comment || 'Sin comentario inicial.'}"
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <ChatWindow 
+                                        requestId={selectedRequest.id} 
+                                        currentUser={currentUser} 
+                                        allChats={chats} 
+                                        onSendMessage={() => {}} // No se puede enviar en chats archivados
+                                        isAdmin={true} 
+                                        onCloseChat={() => {}} // No se puede cerrar de nuevo
+                                        isArchived={true}
+                                    />
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- DASHBOARD ADMIN MODIFICADO (con pestañas) ---
+        function AdminDashboard({ users, entries, advices, helpRequests, chats, onStartChat, onSendMessage, onCloseChat, currentUser }) {
+            const [activeTab, setActiveTab] = React.useState('active'); // 'active' o 'archived'
+
+            // FILTRADO: 
+            const activeRequests = helpRequests.filter(req => req.status !== 'closed');
+            const archivedRequests = helpRequests.filter(req => req.status === 'closed').sort((a, b) => b.timestamp - a.timestamp); // Ordenar por más reciente
+            
+            const clientsWithActiveRequests = users.filter(user => 
+                user.type === 1 && activeRequests.some(req => req.userId === user.id)
+            );
+            
+            return (
+                <div className="max-w-5xl mx-auto p-6 space-y-6">
+                    <h2 className="text-3xl font-bold text-gray-800">Panel de Administración</h2>
+
+                    {/* Navegación de Pestañas */}
+                    <div className="border-b border-gray-200">
+                        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button
+                                onClick={() => setActiveTab('active')}
+                                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${
+                                    activeTab === 'active' 
+                                    ? 'border-cyan-600 text-cyan-600' 
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                Solicitudes Pendientes/Activas ({activeRequests.length})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('archived')}
+                                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition ${
+                                    activeTab === 'archived' 
+                                    ? 'border-cyan-600 text-cyan-600' 
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                            >
+                                Chats Archivados ({archivedRequests.length})
+                            </button>
+                        </nav>
+                    </div>
+
+                    {/* Contenido de la Pestaña Activa */}
+                    {activeTab === 'active' && (
+                        clientsWithActiveRequests.length === 0 ? (
+                            <div className="max-w-4xl mx-auto p-12 text-center text-gray-500">
+                                <div className="bg-white p-8 rounded-2xl shadow border border-gray-100">
+                                    <h2 className="text-2xl font-bold mb-2">¡Todo al día!</h2>
+                                    <p>Actualmente ningún usuario ha solicitado ayuda o tiene un chat activo.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid gap-8">
+                                {clientsWithActiveRequests.map(client => {
+                                    const clientHistory = entries.filter(e => e.userId === client.id);
+                                    const request = activeRequests.find(r => r.userId === client.id);
+                                    
+                                    return (
+                                        <div key={client.id} className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative">
+                                            {/* Badge de Estado */}
+                                            <div className={`absolute top-0 right-0 px-4 py-1 text-xs font-bold text-white rounded-bl-lg ${
+                                                request.status === 'pending' ? 'bg-yellow-500' : 'bg-green-600'
+                                            }`}>
+                                                {request.status === 'pending' ? 'Solicitud Pendiente' : 'Chat Activo'}
+                                            </div>
+
+                                            <div className="bg-gray-50 p-4 border-b border-gray-200">
+                                                <h3 className="text-lg font-bold text-gray-800">Usuario ID: {client.id} <span className="font-normal text-sm text-gray-500">({client.email})</span></h3>
+                                                {/* Mostrar Comentario del Usuario */}
+                                                {request.comment && (
+                                                    <div className="mt-2 bg-yellow-50 p-3 rounded border border-yellow-100 text-sm italic text-gray-700">
+                                                        <span className="font-bold text-yellow-700 not-italic">Mensaje del usuario:</span> "{request.comment}"
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="p-4 grid lg:grid-cols-2 gap-6">
+                                                {/* Columna Izquierda: Historial */}
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-700 mb-3 border-b pb-1">Historial Emocional</h4>
+                                                    <HistoryList entries={clientHistory} />
+                                                </div>
+                                                
+                                                {/* Columna Derecha: Acciones / Chat */}
+                                                <div className="flex flex-col">
+                                                    <h4 className="font-semibold text-gray-700 mb-3 border-b pb-1">Asistencia</h4>
+                                                    
+                                                    {request.status === 'pending' ? (
+                                                        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6">
+                                                            <p className="text-sm text-gray-500 mb-4 text-center">El usuario está esperando respuesta.</p>
+                                                            <button 
+                                                                onClick={() => onStartChat(request.id)}
+                                                                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow transition flex items-center gap-2"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                                                                Iniciar Chat de Ayuda
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <ChatWindow 
+                                                            requestId={request.id} 
+                                                            currentUser={currentUser} 
+                                                            allChats={chats} 
+                                                            onSendMessage={onSendMessage} 
+                                                            isAdmin={true} 
+                                                            onCloseChat={onCloseChat}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )
+                    )}
+
+                    {activeTab === 'archived' && (
+                        <ArchivedChatsView 
+                            archivedRequests={archivedRequests}
+                            users={users}
+                            entries={entries}
+                            chats={chats}
+                            currentUser={currentUser}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        function HistoryList({ entries }) {
+            if (!entries || entries.length === 0) return <p className="text-gray-400 italic text-sm">Sin registros aún.</p>;
+            const sorted = [...entries].sort((a, b) => b.timestamp - a.timestamp);
+
+            return (
+                <ul className="divide-y divide-gray-100 max-h-60 overflow-y-auto">
+                    {sorted.map(entry => (
+                        <li key={entry.id} className="py-2 flex justify-between items-center text-sm pr-2">
+                            <div>
+                                <span className="font-semibold text-gray-700">{entry.emotionName}</span>
+                                <span className="text-gray-400 mx-2">|</span>
+                                <span className="text-gray-500">{formatDate(entry.date)}</span>
+                                <span className="text-xs text-gray-400 ml-2">({formatTime(entry.date)})</span>
+                                <div className="text-xs text-gray-400 mt-0.5">Hábito: {entry.habit}</div>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                entry.emotionLevel >= 8 ? 'bg-red-100 text-red-700' : 
+                                entry.emotionLevel >= 5 ? 'bg-yellow-100 text-yellow-700' : 
+                                'bg-green-100 text-green-700'
+                            }`}>
+                                {entry.emotionLevel}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            );
+        }
+        
+        // El resto de componentes (EntryForm, SmartWeeklyReport, IntensityChart, ClientReportDashboard, SettingsDashboard) 
+        // se mantienen igual que en la versión anterior para no sobrecargar el código, 
+        // pero se asume que están definidos correctamente. 
+        // A continuación, solo incluiremos EntryForm para mantener la coherencia.
+        
+        function EntryForm({ onAddEntry, emotionsList, habitsList, onAddEmotion, onAddHabit }) {
+            const [level, setLevel] = React.useState(5);
+            const [emotion, setEmotion] = React.useState(emotionsList[0] || 'Estrés');
+            const [habit, setHabit] = React.useState(habitsList[0] || 'Trabajo');
+            const [feedback, setFeedback] = React.useState(false);
+            
+            const [newEmo, setNewEmo] = React.useState('');
+            const [newHab, setNewHabit] = React.useState('');
+
+            const getColorClass = (lvl) => {
+                if (lvl >= 8) return 'text-red-600 bg-red-100 border-red-300';
+                if (lvl >= 5) return 'text-yellow-600 bg-yellow-100 border-yellow-300';
+                return 'text-green-600 bg-green-100 border-green-300';
+            };
+
+            const getSliderColor = (lvl) => {
+                if (lvl >= 8) return '#ef4444'; 
+                if (lvl >= 5) return '#f59e0b'; 
+                return '#10b981'; 
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onAddEntry({ level: parseInt(level), emotion, habit });
+                setLevel(5); 
+                setFeedback(true);
+                setTimeout(() => setFeedback(false), 2000);
+            };
+
+            const handleAddNewEmo = () => {
+                if(newEmo.trim()) {
+                    onAddEmotion(newEmo.trim());
+                    setEmotion(newEmo.trim()); 
+                    setNewEmo('');
+                }
+            };
+
+            const handleAddNewHabit = () => {
+                if(newHab.trim()) {
+                    onAddHabit(newHab.trim());
+                    setHabit(newHab.trim()); 
+                    setNewHabit('');
+                }
+            };
+            
+            const sliderStyle = {
+                '--slider-color': getSliderColor(parseInt(level)),
+                'background': 'transparent' 
+            };
+
+            return (
+                <div className="max-w-lg mx-auto p-6">
+                    {feedback && <div className="bg-green-100 text-green-700 p-3 rounded mb-4 text-center font-medium">¡Registro Guardado!</div>}
+                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-lg space-y-6">
+                        <h2 className="text-xl font-bold text-gray-800">Nuevo Registro</h2>
+                        
+                        <div className="text-center">
+                            <label className="block text-sm font-medium mb-1 text-gray-700">Intensidad</label>
+                            <span className={`inline-block px-4 py-2 rounded-full text-2xl font-extrabold transition-colors duration-300 border-2 ${getColorClass(parseInt(level))}`}>
+                                {level}
+                            </span>
+                            
+                            <input 
+                                type="range" 
+                                min="1" 
+                                max="10" 
+                                value={level} 
+                                onChange={e=>setLevel(e.target.value)} 
+                                style={sliderStyle}
+                            />
+                            
+                            <div className="flex justify-between text-xs text-gray-400 mt-1 px-1">
+                                <span>1 (Leve)</span>
+                                <span>10 (Intenso)</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Emoción</label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {emotionsList.map(e => (
+                                    <button type="button" key={e} onClick={()=>setEmotion(e)}
+                                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${emotion===e ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
+                                        {e}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="+ Otra emoción" value={newEmo} onChange={e=>setNewEmo(e.target.value)}
+                                    className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 focus:outline-none focus:border-cyan-500"/>
+                                <button type="button" onClick={handleAddNewEmo} className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300">Añadir</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Hábito</label>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {habitsList.map(h => (
+                                    <button type="button" key={h} onClick={()=>setHabit(h)}
+                                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${habit===h ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
+                                        {h}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="+ Otra actividad" value={newHab} onChange={e=>setNewHabit(e.target.value)}
+                                    className="text-sm border border-gray-300 rounded px-2 py-1 flex-1 focus:outline-none focus:border-cyan-500"/>
+                                <button type="button" onClick={handleAddNewHabit} className="bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-300">Añadir</button>
+                            </div>
+                        </div>
+
+                        <button type="submit" className="w-full bg-cyan-600 text-white font-bold py-3 rounded-lg hover:bg-cyan-700 transition shadow-md">Guardar</button>
+                    </form>
+                </div>
+            );
+        }
+        
+        // Incluimos los demás componentes necesarios para que el código compile
+        
+        // COMPONENTE SmartWeeklyReport (Mantenido de la versión anterior)
+        function SmartWeeklyReport({ entries }) {
+            const [currentDate, setCurrentDate] = React.useState(new Date());
+
+            const getLocalYMD = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0'); 
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            
+            const todayStr = getLocalYMD(new Date());
+
+            const getMonday = (d) => {
+                const date = new Date(d);
+                const day = date.getDay(); 
+                const diff = date.getDate() - ((day + 6) % 7); 
+                date.setDate(diff);
+                date.setHours(0,0,0,0); 
+                return date;
+            };
+
+            const addDays = (d, days) => {
+                const date = new Date(d);
+                date.setDate(date.getDate() + days);
+                return date;
+            };
+
+            const startOfWeek = getMonday(currentDate);
+            const endOfWeek = addDays(startOfWeek, 6);
+            const endOfWeekLimit = new Date(endOfWeek);
+            endOfWeekLimit.setHours(23, 59, 59, 999);
+
+            const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+            
+            const weekEntries = entries.filter(e => {
+                const d = new Date(e.date);
+                return d >= startOfWeek && d <= endOfWeekLimit;
+            });
+
+            const totalWeekLevel = weekEntries.reduce((sum, e) => sum + e.emotionLevel, 0);
+            const weekAvg = weekEntries.length > 0 ? (totalWeekLevel / weekEntries.length).toFixed(1) : 0;
+            
+            const emotionCounts = weekEntries.reduce((acc, e) => {
+                acc[e.emotionName] = (acc[e.emotionName] || 0) + 1;
+                return acc;
+            }, {});
+            const dominantEmotion = Object.keys(emotionCounts).reduce((a, b) => emotionCounts[a] > emotionCounts[b] ? a : b, 'N/A');
+
+            const chartData = dayNames.map((name, index) => {
+                const dayDate = addDays(startOfWeek, index);
+                const dayStr = getLocalYMD(dayDate); 
+                
+                const dayEntries = weekEntries.filter(e => {
+                    return getLocalYMD(new Date(e.date)) === dayStr;
+                });
+                
+                const dayTotal = dayEntries.reduce((sum, e) => sum + e.emotionLevel, 0);
+                const dayAvg = dayEntries.length > 0 ? (dayTotal / dayEntries.length).toFixed(1) : 0;
+                
+                const dayEmoCounts = dayEntries.reduce((acc, e) => { acc[e.emotionName] = (acc[e.emotionName] || 0) + 1; return acc; }, {});
+                const topDayEmo = Object.keys(dayEmoCounts).length > 0 
+                    ? Object.keys(dayEmoCounts).reduce((a, b) => dayEmoCounts[a] > dayEmoCounts[b] ? a : b)
+                    : null;
+
+                const dayMonth = dayDate.toLocaleDateString('es-CO', { day: 'numeric', month: 'numeric' });
+
+                return {
+                    day: name,
+                    fullDate: dayDate,
+                    dateStr: dayStr, 
+                    avg: dayAvg,
+                    count: dayEntries.length,
+                    topEmotion: topDayEmo,
+                    dayMonth: dayMonth 
+                };
+            });
+
+            const prevWeek = () => setCurrentDate(addDays(currentDate, -7));
+            const nextWeek = () => setCurrentDate(addDays(currentDate, 7));
+            
+            const todayStartOfWeek = getMonday(new Date());
+            const isCurrentWeek = todayStartOfWeek.getTime() === startOfWeek.getTime();
+
+
+            return (
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                    <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
+                        <button onClick={prevWeek} className="p-2 hover:bg-gray-200 rounded-full text-gray-500 transition">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <div className="text-center">
+                            <h3 className="font-bold text-gray-800">Reporte Semanal</h3>
+                            <p className="text-xs text-gray-500 font-medium">
+                                {startOfWeek.toLocaleDateString('es-CO', {day:'numeric', month:'short'})} - {endOfWeek.toLocaleDateString('es-CO', {day:'numeric', month:'short'})}
+                            </p>
+                        </div>
+                        <button onClick={nextWeek} className={`p-2 rounded-full transition ${isCurrentWeek ? 'text-gray-300 cursor-not-allowed' : 'hover:bg-gray-200 text-gray-500'}`} disabled={isCurrentWeek}>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 p-4">
+                        <div className="bg-cyan-50 p-3 rounded-lg text-center">
+                            <div className="text-2xl font-bold text-cyan-700">{weekAvg}</div>
+                            <div className="text-[10px] uppercase text-cyan-600 font-semibold tracking-wider">Promedio</div>
+                        </div>
+                        <div className="bg-indigo-50 p-3 rounded-lg text-center">
+                            <div className="text-2xl font-bold text-indigo-700">{weekEntries.length}</div>
+                            <div className="text-[10px] uppercase text-indigo-600 font-semibold tracking-wider">Registros</div>
+                        </div>
+                        <div className="bg-purple-50 p-3 rounded-lg text-center flex flex-col justify-center items-center">
+                            <div className="text-sm font-bold text-purple-700 truncate w-full px-1">{dominantEmotion === 'N/A' ? '-' : dominantEmotion}</div>
+                            <div className="text-[10px] uppercase text-purple-600 font-semibold tracking-wider">Dominante</div>
+                        </div>
+                    </div>
+
+                    <div className="p-4 pt-2">
+                        <div className="flex items-end justify-between h-48 relative mt-2">
+                            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                                <div className="border-t border-gray-100 w-full h-0"></div>
+                                <div className="border-t border-gray-100 w-full h-0"></div>
+                                <div className="border-t border-gray-100 w-full h-0"></div>
+                                <div className="border-t border-gray-200 w-full h-0"></div> 
+                            </div>
+
+                            {chartData.map((item, idx) => {
+                                const heightPercent = (item.avg / 10) * 100;
+                                let colorClass = 'bg-gray-300';
+                                if (item.count > 0) {
+                                    colorClass = item.avg > 7 ? 'bg-red-400' : (item.avg > 4 ? 'bg-amber-400' : 'bg-emerald-400');
+                                }
+                                
+                                const isToday = item.dateStr === todayStr && isCurrentWeek;
+
+                                return (
+                                    <div key={idx} className="flex flex-col items-center justify-end h-full w-1/7 group relative z-10">
+                                        
+                                        <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none bg-gray-800 text-white text-xs rounded py-1 px-2 z-20 whitespace-nowrap shadow-xl">
+                                            <div className="font-bold">{item.fullDate.toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'short'})}</div>
+                                            <div>Prom: {item.avg}</div>
+                                            <div>Regs: {item.count}</div>
+                                            {item.topEmotion && <div className="text-gray-300 italic">{item.topEmotion}</div>}
+                                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                                        </div>
+
+                                        {item.count > 0 && (
+                                            <span className="text-[10px] font-bold text-gray-500 mb-1">{item.avg}</span>
+                                        )}
+
+                                        <div 
+                                            className={`w-3 sm:w-6 rounded-t-md transition-all duration-500 ${colorClass} ${item.count === 0 ? 'h-1 opacity-50' : 'animate-bar-grow hover:brightness-110'} ${isToday ? 'ring-2 ring-cyan-500 ring-offset-2' : ''}`} 
+                                            style={{ height: `${Math.max(item.count > 0 ? 10 : 2, heightPercent)}%` }}
+                                        ></div>
+                                        
+                                        <div className={`text-xs mt-2 font-medium flex flex-col items-center leading-tight ${
+                                            isToday
+                                            ? 'text-cyan-600 font-bold bg-cyan-50 px-1 rounded' 
+                                            : 'text-gray-400'
+                                        }`}>
+                                            <span className="text-[10px]">{item.day}</span>
+                                            <span className="text-[10px] mt-0.5">{item.dayMonth}</span> 
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        // COMPONENTE IntensityChart (Mantenido de la versión anterior)
+        function IntensityChart({ entries }) {
+            if (!entries || entries.length === 0) return null;
+
+            const emotionStats = entries.reduce((acc, curr) => {
+                if (!acc[curr.emotionName]) {
+                    acc[curr.emotionName] = { sum: 0, count: 0 };
+                }
+                acc[curr.emotionName].sum += curr.emotionLevel;
+                acc[curr.emotionName].count += 1;
+                return acc;
+            }, {});
+
+            const data = Object.keys(emotionStats).map(name => ({
+                name,
+                avg: (emotionStats[name].sum / emotionStats[name].count).toFixed(1),
+                count: emotionStats[name].count 
+            })).sort((a, b) => b.avg - a.avg);
+
+            return (
+                <div className="space-y-4">
+                    <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Desglose por Emoción</h3>
+                    {data.map(item => {
+                        const widthPercent = (item.avg / 10) * 100;
+                        const colorClass = item.avg > 7 ? 'bg-red-500' : (item.avg > 4 ? 'bg-yellow-500' : 'bg-green-500');
+                        
+                        return (
+                            <div key={item.name} className="flex items-center text-sm">
+                                <div className="w-24 font-medium text-gray-600 truncate mr-2 text-xs uppercase tracking-wide">{item.name}</div>
+                                <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden relative">
+                                    <div 
+                                        className={`h-full rounded-full ${colorClass}`} 
+                                        style={{ width: `${widthPercent}%` }}
+                                    ></div>
+                                </div>
+                                <div className="flex items-center w-12 justify-end ml-2">
+                                    <span className="text-right font-bold text-gray-700 text-xs">{item.avg}</span>
+                                    <span className="ml-1 text-[10px] text-gray-400 font-medium">({item.count})</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        // COMPONENTE ClientReportDashboard (Mantenido de la versión anterior)
+        function ClientReportDashboard({ entries, myAdvices }) {
+            // El componente SmartWeeklyReport y IntensityChart deben estar definidos
+            return (
+                <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-8">
+                    {/* Header Consejos */}
+                    {myAdvices.length > 0 && (
+                        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-100 p-5 rounded-2xl shadow-sm">
+                            <h3 className="text-sm font-bold text-blue-800 mb-3 flex items-center uppercase tracking-wide">
+                                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" /></svg>
+                                Mensajes del Especialista
+                            </h3>
+                            <div className="space-y-3">
+                                {myAdvices.slice().reverse().map(advice => (
+                                    <div key={advice.id} className="bg-white/80 backdrop-blur p-3 rounded-lg shadow-sm border border-white">
+                                        <p className="text-gray-700 text-sm italic">"{advice.message}"</p>
+                                        <p className="text-[10px] text-gray-400 mt-1 text-right">{new Date(advice.timestamp).toLocaleDateString()}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    <SmartWeeklyReport entries={entries} />
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                            <IntensityChart entries={entries} />
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                            <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Historial Reciente</h3>
+                            <HistoryList entries={entries} />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // COMPONENTE HelpRequestView (Mantenido de la versión anterior)
+        function HelpRequestView({ currentUser, helpRequests, chats, onRequestHelp, onSendMessage }) {
+            // Buscar si ya tiene una solicitud activa o pendiente
+            const myRequest = helpRequests.find(r => r.userId === currentUser.id && r.status !== 'closed');
+            const [comment, setComment] = React.useState('');
+
+            const handleSubmitRequest = (e) => {
+                e.preventDefault();
+                onRequestHelp(currentUser.id, comment);
+            };
+
+            return (
+                <div className="max-w-2xl mx-auto p-6 space-y-8">
+                    <h2 className="text-2xl font-bold text-gray-800">Ayuda Profesional</h2>
+                    
+                    {!myRequest ? (
+                        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 text-center">
+                            <div className="w-16 h-16 bg-cyan-100 text-cyan-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-800 mb-2">¿Necesitas apoyo?</h3>
+                            <p className="text-gray-600 mb-6">Puedes solicitar hablar con un profesional. Si lo deseas, cuéntanos brevemente tu situación.</p>
+                            
+                            <form onSubmit={handleSubmitRequest} className="text-left space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Comentario (Opcional)</label>
+                                    <textarea 
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-transparent" 
+                                        rows="3" 
+                                        placeholder="Describe brevemente cómo te sientes o por qué solicitas ayuda..."
+                                        value={comment}
+                                        onChange={e => setComment(e.target.value)}
+                                    ></textarea>
+                                </div>
+<div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3">
+                                <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <p className="text-xs text-blue-800">
+                                    Al enviar esta solicitud, permitirás que el profesional vea tu historial emocional para brindarte una mejor asistencia.
+                                </p>
+                            </div>
+                                <button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-lg transition shadow-md">
+                                    Solicitar Ayuda
+                                </button>
+                            </form>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {myRequest.status === 'pending' && (
+                                <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-xl text-center">
+                                    <div className="animate-pulse flex justify-center mb-2">
+                                        <div className="h-3 w-3 bg-yellow-400 rounded-full mx-1"></div>
+                                        <div className="h-3 w-3 bg-yellow-400 rounded-full mx-1"></div>
+                                        <div className="h-3 w-3 bg-yellow-400 rounded-full mx-1"></div>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-yellow-800">Solicitud Enviada</h3>
+                                    <p className="text-yellow-700 text-sm mt-1">Tu solicitud está en espera. Un profesional te contactará pronto.</p>
+                                    {myRequest.comment && (
+                                        <div className="mt-4 text-xs text-gray-500 italic bg-white p-2 rounded border border-yellow-100 inline-block">
+                                            " {myRequest.comment} "
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {myRequest.status === 'active' && (
+                                <div className="space-y-4">
+                                    <div className="bg-green-50 border border-green-200 p-4 rounded-xl flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                            <span className="font-bold text-green-800">Conectado con Profesional</span>
+                                        </div>
+                                        {/* Cliente solo puede ver que está activo, el cierre lo maneja el admin */}
+                                    </div>
+                                    <ChatWindow 
+                                        requestId={myRequest.id} 
+                                        currentUser={currentUser} 
+                                        allChats={chats} 
+                                        onSendMessage={onSendMessage}
+                                        isAdmin={false} // Cliente no puede cerrar
+                                        onCloseChat={() => {}} 
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // COMPONENTE SettingsDashboard (Mantenido de la versión anterior)
+        function SettingsDashboard({ emotionsList, habitsList, onRemoveEmotion, onRemoveHabit }) {
+            const DEFAULT_EMOTIONS = ["Estrés", "Ansiedad", "Frustración", "Calma", "Alegría", "Tristeza"]; // Se debe redefinir si se usa en el componente
+            const DEFAULT_HABITS = ["Ejercicio", "Trabajo", "Descanso", "Socializar", "Meditar", "Comer"]; // Se debe redefinir si se usa en el componente
+
+            const ListItem = ({ name, onRemove, isCustom }) => (
+                <li className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <span className="text-gray-700">{name}</span>
+                    {isCustom ? (
+                        <button 
+                            onClick={() => onRemove(name)} 
+                            className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition"
+                            title="Eliminar"
+                        >
+                            <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                    ) : (
+                        <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Default</span>
+                    )}
+                </li>
+            );
+
+            return (
+                <div className="max-w-xl mx-auto p-6 space-y-8">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Configuración</h2>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                        <h3 className="text-lg font-bold text-cyan-800 mb-4 flex items-center">
+                            <span className="mr-2">😊</span> Mis Emociones
+                        </h3>
+                        <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                            {emotionsList.map(e => (
+                                <ListItem key={e} name={e} onRemove={onRemoveEmotion} isCustom={!DEFAULT_EMOTIONS.includes(e)}/>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+                        <h3 className="text-lg font-bold text-cyan-800 mb-4 flex items-center">
+                            <span className="mr-2">🏃</span> Mis Hábitos
+                        </h3>
+                        <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                            {habitsList.map(h => (
+                                <ListItem key={h} name={h} onRemove={onRemoveHabit} isCustom={!DEFAULT_HABITS.includes(h)}/>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            );
+        }
+
+        function App() {
+            const [users, setUsers] = useStickyState(INITIAL_USERS, STORAGE_KEYS.USERS);
+            const [entries, setEntries] = useStickyState(INITIAL_ENTRIES, STORAGE_KEYS.ENTRIES);
+            const [advices, setAdvices] = useStickyState([], STORAGE_KEYS.ADVICES);
+            
+            const [emotionsList, setEmotionsList] = useStickyState(DEFAULT_EMOTIONS, STORAGE_KEYS.EMOTIONS_LIST);
+            const [habitsList, setHabitsList] = useStickyState(DEFAULT_HABITS, STORAGE_KEYS.HABITS_LIST);
+
+            // Nuevos estados para Chat y Ayuda
+            const [helpRequests, setHelpRequests] = useStickyState([], STORAGE_KEYS.HELP_REQUESTS);
+            const [chats, setChats] = useStickyState([], STORAGE_KEYS.CHATS);
+
+            const [currentUser, setCurrentUser] = React.useState(null);
+            const [loginError, setLoginError] = React.useState('');
+            const [currentView, setCurrentView] = React.useState('register'); 
+
+            React.useEffect(() => {
+                const storedUser = window.localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+                if (storedUser) {
+                    setCurrentUser(JSON.parse(storedUser));
+                }
+            }, []);
+
+            React.useEffect(() => {
+                if (currentUser) {
+                    window.localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+                    if (currentUser.type === 0) setCurrentView('admin_users');
+                    else if (currentView === 'register' && currentUser.type === 1) setCurrentView('register'); 
+                    else if (currentView === 'admin_users' && currentUser.type === 1) setCurrentView('register');
+                } else {
+                    window.localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+                }
+            }, [currentUser]);
+
+            const handleLogin = (email, password) => {
+                setLoginError('');
+                const foundUser = users.find(u => u.email === email && u.password === password);
+                if (foundUser) {
+                    setCurrentUser(foundUser);
+                } else {
+                    setLoginError('Email o contraseña incorrectos');
+                }
+            };
+
+            const handleRegister = (email, password) => {
+                setLoginError('');
+                if (users.some(u => u.email === email)) {
+                    setLoginError('Este correo ya está registrado.');
+                    return;
+                }
+                const newUser = { id: Date.now(), email: email, password: password, type: 1 };
+                setUsers([...users, newUser]);
+                setCurrentUser(newUser);
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setCurrentView('register');
+                setLoginError('');
+            };
+
+            const handleAddEntry = ({ level, emotion, habit }) => {
+                const newEntry = {
+                    id: Date.now(),
+                    userId: currentUser.id,
+                    date: getFullISODate(),
+                    emotionLevel: level,
+                    emotionName: emotion,
+                    habit: habit,
+                    timestamp: Date.now()
+                };
+                setEntries(prev => [...prev, newEntry]);
+            };
+
+            const handleSendAdvice = (clientId, message) => {
+                const newAdvice = {
+                    id: Date.now(),
+                    adminId: currentUser.id,
+                    clientId: clientId,
+                    message: message,
+                    timestamp: Date.now()
+                };
+                setAdvices(prev => [...prev, newAdvice]);
+            };
+
+            // --- Handlers Nuevos de Ayuda/Chat ---
+            
+            const handleRequestHelp = (userId, comment) => {
+                const newRequest = {
+                    id: Date.now(), // Request ID sirve como Chat Room ID
+                    userId: userId,
+                    status: 'pending', // pending, active, closed
+                    comment: comment,
+                    timestamp: Date.now()
+                };
+                setHelpRequests(prev => [...prev, newRequest]);
+            };
+
+            const handleStartChat = (requestId) => {
+                setHelpRequests(prev => prev.map(req => 
+                    req.id === requestId ? { ...req, status: 'active' } : req
+                ));
+            };
+
+            // NUEVA FUNCIÓN: Cerrar Chat y Archivar
+            const handleCloseChat = (requestId) => {
+                setHelpRequests(prev => prev.map(req => 
+                    req.id === requestId ? { ...req, status: 'closed', timestamp: Date.now() } : req // Actualizar timestamp para orden
+                ));
+            };
+
+            const handleSendMessage = (requestId, messageText) => {
+                const newMsg = {
+                    id: Date.now(),
+                    requestId: requestId,
+                    senderId: currentUser.id,
+                    message: messageText,
+                    timestamp: Date.now()
+                };
+                setChats(prev => [...prev, newMsg]);
+            };
+
+            // --- Fin Handlers Nuevos ---
+
+            const handleAddCustomEmotion = (newEmo) => {
+                if (!emotionsList.includes(newEmo)) setEmotionsList(prev => [...prev, newEmo]);
+            };
+            const handleAddCustomHabit = (newHab) => {
+                if (!habitsList.includes(newHab)) setHabitsList(prev => [...prev, newHab]);
+            };
+
+            const handleRemoveCustomEmotion = (emotion) => {
+                if (!DEFAULT_EMOTIONS.includes(emotion)) {
+                    setEmotionsList(prev => prev.filter(e => e !== emotion));
+                }
+            };
+            
+            const handleRemoveCustomHabit = (habit) => {
+                if (!DEFAULT_HABITS.includes(habit)) {
+                    setHabitsList(prev => prev.filter(h => h !== habit));
+                }
+            };
+
+            if (!currentUser) return <AuthScreen onLogin={handleLogin} onRegister={handleRegister} error={loginError} />;
+
+            return (
+                <div className="min-h-screen bg-cyan-50 pb-12 font-inter text-gray-700">
+                    <Header user={currentUser} currentView={currentView} setView={setCurrentView} onLogout={handleLogout} />
+                    <main className="container mx-auto px-2 sm:px-4 py-6">
+                        {currentUser.type === 1 && currentView === 'register' && (
+                            <EntryForm 
+                                onAddEntry={handleAddEntry}
+                                emotionsList={emotionsList}
+                                habitsList={habitsList}
+                                onAddEmotion={handleAddCustomEmotion}
+                                onAddHabit={handleAddCustomHabit}
+                            />
+                        )}
+                        {currentUser.type === 1 && currentView === 'reports' && (
+                            <ClientReportDashboard 
+                                entries={entries.filter(e => e.userId === currentUser.id)}
+                                myAdvices={advices.filter(a => a.clientId === currentUser.id)}
+                            />
+                        )}
+                        {/* VISTA PARA CLIENTE */}
+                        {currentUser.type === 1 && currentView === 'help' && (
+                            <HelpRequestView 
+                                currentUser={currentUser}
+                                helpRequests={helpRequests}
+                                chats={chats}
+                                onRequestHelp={handleRequestHelp}
+                                onSendMessage={handleSendMessage}
+                            />
+                        )}
+                        {currentUser.type === 1 && currentView === 'settings' && (
+                            <SettingsDashboard
+                                emotionsList={emotionsList}
+                                habitsList={habitsList}
+                                onRemoveEmotion={handleRemoveCustomEmotion}
+                                onRemoveHabit={handleRemoveCustomHabit}
+                            />
+                        )}
+                        {currentUser.type === 0 && currentView === 'admin_users' && (
+                            <AdminDashboard 
+                                users={users} 
+                                entries={entries} 
+                                advices={advices} 
+                                helpRequests={helpRequests}
+                                chats={chats}
+                                onSendAdvice={handleSendAdvice}
+                                onStartChat={handleStartChat}
+                                onSendMessage={handleSendMessage}
+                                onCloseChat={handleCloseChat} 
+                                currentUser={currentUser}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    
