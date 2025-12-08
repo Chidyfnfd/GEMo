@@ -1,5 +1,5 @@
  // --- Constantes y Simulación de Base de Datos ---
-        const APP_PREFIX = 'gemo_v13_'; // Incrementamos versión para un nuevo caché
+        const APP_PREFIX = 'gemo_v5';
         const STORAGE_KEYS = {
           USERS: `${APP_PREFIX}users`,
           ENTRIES: `${APP_PREFIX}entries`,
@@ -7,25 +7,25 @@
           CURRENT_USER: `${APP_PREFIX}currentUser`,
           EMOTIONS_LIST: `${APP_PREFIX}emotionsList`,
           HABITS_LIST: `${APP_PREFIX}habitsList`,
-          // Nuevas llaves
           HELP_REQUESTS: `${APP_PREFIX}helpRequests`,
           CHATS: `${APP_PREFIX}chats`
         };
 
         const INITIAL_USERS = [
             { id: 1, email: 'admin@gemo.com', password: '123', type: 0 }, 
-            { id: 2, email: 'cliente1@mail.com', password: '123', type: 1 }, 
-            { id: 3, email: 'cliente2@mail.com', password: '123', type: 1 }
+	        { id: 2, email: 'admin4@gemo.com', password: '123', type: 0 }, 
+            { id: 3, email: 'cliente1@mail.com', password: '123', type: 1 }, 
+            { id: 4, email: 'cliente2@mail.com', password: '123', type: 1 }
         ];
 
         const INITIAL_ENTRIES = [
-            { id: 101, userId: 2, date: '2025-11-24T10:00:00.000Z', emotionLevel: 8, emotionName: 'Estrés', habit: 'Trabajo', timestamp: 1732435200000 }, 
-            { id: 102, userId: 2, date: '2025-11-25T14:30:00.000Z', emotionLevel: 4, emotionName: 'Calma', habit: 'Meditar', timestamp: 1732525800000 }, 
-            { id: 103, userId: 2, date: '2025-11-28T09:15:00.000Z', emotionLevel: 9, emotionName: 'Ansiedad', habit: 'Trabajo', timestamp: 1732810500000 }, 
-            { id: 104, userId: 2, date: '2025-11-30T19:00:00.000Z', emotionLevel: 5, emotionName: 'Frustración', habit: 'Socializar', timestamp: 1733022000000 }, 
-            { id: 105, userId: 2, date: '2025-12-01T08:00:00.000Z', emotionLevel: 6, emotionName: 'Estrés', habit: 'Comer', timestamp: 1733097600000 }, 
-            { id: 106, userId: 2, date: '2025-12-02T10:45:00.000Z', emotionLevel: 7, emotionName: 'Frustración', habit: 'Tráfico', timestamp: 1733227500000 }, 
-            { id: 107, userId: 2, date: '2025-12-04T12:00:00.000Z', emotionLevel: 3, emotionName: 'Calma', habit: 'Meditar', timestamp: 1733390400000 }
+            { id: 101, userId: 3, date: '2025-11-24T10:00:00.000Z', emotionLevel: 8, emotionName: 'Estrés', habit: 'Trabajo', timestamp: 1732435200000 }, 
+            { id: 102, userId: 3, date: '2025-11-25T14:30:00.000Z', emotionLevel: 4, emotionName: 'Calma', habit: 'Meditar', timestamp: 1732525800000 }, 
+            { id: 103, userId: 3, date: '2025-11-28T09:15:00.000Z', emotionLevel: 9, emotionName: 'Ansiedad', habit: 'Trabajo', timestamp: 1732810500000 }, 
+            { id: 104, userId: 3, date: '2025-11-30T19:00:00.000Z', emotionLevel: 5, emotionName: 'Frustración', habit: 'Socializar', timestamp: 1733022000000 }, 
+            { id: 105, userId: 3, date: '2025-12-01T08:00:00.000Z', emotionLevel: 6, emotionName: 'Estrés', habit: 'Comer', timestamp: 1733097600000 }, 
+            { id: 106, userId: 3, date: '2025-12-02T10:45:00.000Z', emotionLevel: 7, emotionName: 'Frustración', habit: 'Tráfico', timestamp: 1733227500000 }, 
+            { id: 107, userId: 3, date: '2025-12-04T12:00:00.000Z', emotionLevel: 3, emotionName: 'Calma', habit: 'Meditar', timestamp: 1733390400000 }
         ];
 
         const DEFAULT_EMOTIONS = ["Estrés", "Ansiedad", "Frustración", "Calma", "Alegría", "Tristeza"];
@@ -43,6 +43,12 @@
         const formatTime = (isoString) => {
             const date = new Date(isoString);
             return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        };
+
+        const formatDateForInput = (timestamp) => {
+            if(!timestamp) return '';
+            const d = new Date(timestamp);
+            return d.toISOString().split('T')[0];
         };
 
         function useStickyState(defaultValue, key) {
@@ -134,7 +140,8 @@
                 {!isRegistering && (
                     <div className="mt-6 text-xs text-gray-400 bg-gray-100 p-3 rounded">
                     <p><strong>Credenciales Demo:</strong></p>
-                    <p>Admin: admin@gemo.com / 123</p>
+                    <p>Admin 1: admin@gemo.com / 123</p>
+                    <p>Admin 2: admin4@gemo.com / 123 (Para probar exclusividad)</p>
                     <p>Cliente: cliente1@mail.com / 123</p>
                     </div>
                 )}
@@ -172,7 +179,7 @@
         }
 
         // --- COMPONENTE CHAT ---
-        function ChatWindow({ requestId, currentUser, allChats, onSendMessage, isAdmin, onCloseChat, isArchived = false }) {
+        function ChatWindow({ requestId, currentUser, allChats, onSendMessage, isAdmin, onCloseChat, isArchived = false, professionalName = 'Profesional' }) {
             const [msgText, setMsgText] = React.useState('');
             const chatRef = React.useRef(null);
 
@@ -195,7 +202,10 @@
             return (
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-lg flex flex-col h-96">
                     <div className="bg-cyan-700 p-3 text-white font-bold text-sm flex justify-between items-center">
-                        <span>{isArchived ? 'Historial de Chat' : 'Chat en Vivo'}</span>
+                        <div className="flex flex-col">
+                            <span>{isArchived ? 'Historial de Chat' : 'Chat en Vivo'}</span>
+                            {!isAdmin && !isArchived && <span className="text-[10px] text-cyan-200 font-normal">Atendido por: {professionalName}</span>}
+                        </div>
                         {isAdmin && !isArchived && (
                             <button 
                                 onClick={() => onCloseChat(requestId)} 
@@ -216,13 +226,15 @@
                         )}
                         {messages.map(msg => {
                             const isMe = msg.senderId === currentUser.id;
-                            const senderName = isMe ? 'Yo' : (isAdmin ? `Cliente ${msg.senderId}` : 'Profesional');
+                            // Si soy usuario, el "other" es el profesional (mostrar nombre si está disponible)
+                            const senderLabel = isMe ? 'Yo' : (isAdmin ? `Cliente ${msg.senderId}` : professionalName);
+                            
                             return (
                                 <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`max-w-[80%] rounded-lg p-3 text-sm shadow-sm ${
                                         isMe ? 'bg-cyan-600 text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
                                     }`}>
-                                        <p className={`text-[10px] font-bold mb-1 ${isMe ? 'text-cyan-200' : 'text-cyan-700'}`}>{senderName}</p>
+                                        <p className={`text-[10px] font-bold mb-1 ${isMe ? 'text-cyan-200' : 'text-cyan-700'}`}>{senderLabel}</p>
                                         <p>{msg.message}</p>
                                         <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-cyan-100' : 'text-gray-400'}`}>
                                             {formatTime(new Date(msg.timestamp))}
@@ -254,100 +266,165 @@
         // --- VISTA ARCHIVADOS (ADMIN) ---
         function ArchivedChatsView({ archivedRequests, users, entries, chats, currentUser }) {
             const [selectedRequest, setSelectedRequest] = React.useState(null);
+            
+            // Filtros de búsqueda MODIFICADOS
+            const [searchId, setSearchId] = React.useState('');
+            const [searchUserId, setSearchUserId] = React.useState(''); // Búsqueda por ID Usuario
+            const [searchUserEmail, setSearchUserEmail] = React.useState(''); // Búsqueda por Email
 
-            const clientsArchived = users.filter(user => 
-                archivedRequests.some(req => req.userId === user.id)
-            );
+            // Filtrar la lista de archivados
+            const filteredRequests = archivedRequests.filter(req => {
+                // Filtro 1: ID de Chat
+                const matchesId = searchId ? String(req.id).includes(searchId) : true;
+                
+                // Filtro 2: ID de Usuario
+                const matchesUserId = searchUserId ? String(req.userId).includes(searchUserId) : true;
+
+                // Filtro 3: Email de Usuario
+                let matchesEmail = true;
+                if (searchUserEmail) {
+                    const clientUser = users.find(u => u.id === req.userId);
+                    if (clientUser) {
+                        matchesEmail = clientUser.email.toLowerCase().includes(searchUserEmail.toLowerCase());
+                    } else {
+                        matchesEmail = false; // No se encuentra usuario, no coincide
+                    }
+                }
+
+                return matchesId && matchesUserId && matchesEmail;
+            });
 
             // Sincronizar selección al cambiar la lista
             React.useEffect(() => {
-                if (archivedRequests.length > 0 && !selectedRequest) {
-                    setSelectedRequest(archivedRequests[0]);
-                } else if (selectedRequest && !archivedRequests.find(r => r.id === selectedRequest.id)) {
-                    // Si el chat seleccionado ya no existe (no debería pasar aquí)
-                    setSelectedRequest(archivedRequests.length > 0 ? archivedRequests[0] : null);
+                if (filteredRequests.length > 0 && !selectedRequest) {
+                    setSelectedRequest(filteredRequests[0]);
+                } else if (selectedRequest && !filteredRequests.find(r => r.id === selectedRequest.id)) {
+                    setSelectedRequest(filteredRequests.length > 0 ? filteredRequests[0] : null);
                 }
-            }, [archivedRequests]);
-
-            if (archivedRequests.length === 0) {
-                return (
-                    <div className="max-w-4xl mx-auto p-12 text-center text-gray-500">
-                        <div className="bg-white p-8 rounded-2xl shadow border border-gray-100">
-                            <h2 className="text-2xl font-bold mb-2">Historial de Chats Vacío</h2>
-                            <p>Los chats que finalices se mostrarán aquí.</p>
-                        </div>
-                    </div>
-                );
-            }
-
-            const currentClient = selectedRequest ? clientsArchived.find(c => c.id === selectedRequest.userId) : null;
-            const clientHistory = currentClient ? entries.filter(e => e.userId === currentClient.id) : [];
+            }, [filteredRequests, searchId, searchUserId, searchUserEmail]);
 
             return (
                 <div className="max-w-5xl mx-auto space-y-4">
-                    <h3 className="text-xl font-bold text-gray-800">Chats Archivados ({archivedRequests.length})</h3>
+                    <h3 className="text-xl font-bold text-gray-800">Chats Archivados</h3>
                     
-                    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col lg:flex-row">
-                        {/* Lista de Chats Archivados */}
-                        <div className="lg:w-1/3 border-r border-gray-100 p-4 max-h-[700px] overflow-y-auto">
-                            <h4 className="text-sm font-semibold text-gray-600 mb-3 border-b pb-2">Seleccionar Cliente:</h4>
-                            <ul className="space-y-2">
-                                {archivedRequests.map(req => {
-                                    const client = clientsArchived.find(c => c.id === req.userId);
-                                    const isActive = selectedRequest && selectedRequest.id === req.id;
-                                    return (
-                                        <li key={req.id}>
-                                            <button 
-                                                onClick={() => setSelectedRequest(req)}
-                                                className={`w-full text-left p-3 rounded-lg transition ${
-                                                    isActive 
-                                                    ? 'bg-cyan-600 text-white shadow-md' 
-                                                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
-                                                }`}
-                                            >
-                                                <span className="font-bold text-sm">Cliente ID: {req.userId}</span>
-                                                <p className={`text-xs mt-0.5 ${isActive ? 'text-cyan-200' : 'text-gray-500'}`}>
-                                                    Archivado: {formatDate(new Date(req.timestamp).toISOString())}
-                                                </p>
-                                            </button>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
+                    {/* Barra de Filtros MODIFICADA */}
+                    <div className="bg-white p-4 rounded-xl shadow border border-gray-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Buscar por ID de Chat</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: 1732..." 
+                                value={searchId}
+                                onChange={e => setSearchId(e.target.value)}
+                                className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none"
+                            />
                         </div>
-                        
-                        {/* Detalle del Chat y Historial */}
-                        <div className="lg:w-2/3 p-4 space-y-4">
-                            {selectedRequest && (
-                                <>
-                                    <h4 className="text-lg font-bold text-gray-800 border-b pb-2">Detalle de Conversación (Cliente ID: {currentClient.id})</h4>
-                                    
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <h5 className="font-semibold text-gray-700">Historial Emocional del Cliente:</h5>
-                                            <HistoryList entries={clientHistory} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <h5 className="font-semibold text-gray-700">Comentario Inicial:</h5>
-                                            <div className="bg-gray-50 p-3 rounded text-sm italic border border-gray-200">
-                                                "{selectedRequest.comment || 'Sin comentario inicial.'}"
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <ChatWindow 
-                                        requestId={selectedRequest.id} 
-                                        currentUser={currentUser} 
-                                        allChats={chats} 
-                                        onSendMessage={() => {}} // No se puede enviar en chats archivados
-                                        isAdmin={true} 
-                                        onCloseChat={() => {}} // No se puede cerrar de nuevo
-                                        isArchived={true}
-                                    />
-                                </>
-                            )}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Buscar por ID de Usuario</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: 3"
+                                value={searchUserId}
+                                onChange={e => setSearchUserId(e.target.value)}
+                                className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Buscar por Correo Usuario</label>
+                            <input 
+                                type="text" 
+                                placeholder="Ej: cliente1@..."
+                                value={searchUserEmail}
+                                onChange={e => setSearchUserEmail(e.target.value)}
+                                className="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none"
+                            />
                         </div>
                     </div>
+
+                    {filteredRequests.length === 0 ? (
+                        <div className="bg-white p-8 rounded-2xl shadow border border-gray-100 text-center text-gray-500">
+                            <p>No se encontraron chats con estos criterios.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col lg:flex-row">
+                            {/* Lista de Chats Archivados */}
+                            <div className="lg:w-1/3 border-r border-gray-100 p-4 max-h-[700px] overflow-y-auto">
+                                <h4 className="text-sm font-semibold text-gray-600 mb-3 border-b pb-2">Resultados ({filteredRequests.length}):</h4>
+                                <ul className="space-y-2">
+                                    {filteredRequests.map(req => {
+                                        const isActive = selectedRequest && selectedRequest.id === req.id;
+                                        const clientUser = users.find(u => u.id === req.userId);
+                                        const clientEmail = clientUser ? clientUser.email : 'Usuario Eliminado';
+
+                                        return (
+                                            <li key={req.id}>
+                                                <button 
+                                                    onClick={() => setSelectedRequest(req)}
+                                                    className={`w-full text-left p-3 rounded-lg transition ${
+                                                        isActive 
+                                                        ? 'bg-cyan-600 text-white shadow-md' 
+                                                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200'
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <span className="font-bold text-xs">Chat ID: {req.id}</span>
+                                                        <span className={`text-[10px] ${isActive ? 'text-cyan-200' : 'text-gray-400'}`}>{formatDate(new Date(req.endTime).toISOString())}</span>
+                                                    </div>
+                                                    <div className={`text-xs mt-1 ${isActive ? 'text-cyan-50' : 'text-gray-600'}`}>
+                                                        <p className="truncate font-medium">{clientEmail}</p>
+                                                        <p className={`text-[10px] mt-0.5 ${isActive ? 'text-cyan-200' : 'text-gray-400'}`}>ID Usuario: {req.userId}</p>
+                                                    </div>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                            
+                            {/* Detalle del Chat */}
+                            <div className="lg:w-2/3 p-4 space-y-4">
+                                {selectedRequest && (
+                                    <>
+                                        <div className="border-b pb-2">
+                                            <h4 className="text-lg font-bold text-gray-800">Detalle de Chat #{selectedRequest.id}</h4>
+                                            <p className="text-xs text-gray-500">
+                                                Cliente ID: {selectedRequest.userId} | 
+                                                Atendido por Admin ID: {selectedRequest.adminId}
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                Duración: {selectedRequest.startTime ? formatTime(selectedRequest.startTime) : ''} - {selectedRequest.endTime ? formatTime(selectedRequest.endTime) : ''}
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <h5 className="font-semibold text-gray-700">Comentario Inicial:</h5>
+                                                <div className="bg-gray-50 p-3 rounded text-sm italic border border-gray-200">
+                                                    "{selectedRequest.comment || 'Sin comentario inicial.'}"
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <h5 className="font-semibold text-gray-700">Historial Reciente (Snapshot):</h5>
+                                                {/* Mostramos historial actual del cliente asociado */}
+                                                <HistoryList entries={entries.filter(e => e.userId === selectedRequest.userId)} />
+                                            </div>
+                                        </div>
+                                        
+                                        <ChatWindow 
+                                            requestId={selectedRequest.id} 
+                                            currentUser={currentUser} 
+                                            allChats={chats} 
+                                            onSendMessage={() => {}} 
+                                            isAdmin={true} 
+                                            onCloseChat={() => {}} 
+                                            isArchived={true}
+                                            professionalName={`Admin ${selectedRequest.adminId}`}
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -356,10 +433,18 @@
         function AdminDashboard({ users, entries, advices, helpRequests, chats, onStartChat, onSendMessage, onCloseChat, currentUser }) {
             const [activeTab, setActiveTab] = React.useState('active'); // 'active' o 'archived'
 
-            // FILTRADO: 
-            const activeRequests = helpRequests.filter(req => req.status !== 'closed');
-            const archivedRequests = helpRequests.filter(req => req.status === 'closed').sort((a, b) => b.timestamp - a.timestamp); // Ordenar por más reciente
+            // FILTRADO ESTRICTO SEGÚN REGLAS DE PRIVACIDAD
+            // Regla: Pendiente es visible para todos. Activo SOLO si el adminId coincide con currentUser.id
+            const activeRequests = helpRequests.filter(req => {
+                if (req.status === 'pending') return true;
+                if (req.status === 'active') return req.adminId === currentUser.id;
+                return false;
+            });
+
+            // Archivados: Visible para todos una vez cerrado
+            const archivedRequests = helpRequests.filter(req => req.status === 'closed').sort((a, b) => b.endTime - a.endTime); 
             
+            // Usuarios para renderizar tarjetas de activos
             const clientsWithActiveRequests = users.filter(user => 
                 user.type === 1 && activeRequests.some(req => req.userId === user.id)
             );
@@ -389,7 +474,7 @@
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                             >
-                                Chats Archivados ({archivedRequests.length})
+                                Historial de Chats ({archivedRequests.length})
                             </button>
                         </nav>
                     </div>
@@ -399,8 +484,8 @@
                         clientsWithActiveRequests.length === 0 ? (
                             <div className="max-w-4xl mx-auto p-12 text-center text-gray-500">
                                 <div className="bg-white p-8 rounded-2xl shadow border border-gray-100">
-                                    <h2 className="text-2xl font-bold mb-2">¡Todo al día!</h2>
-                                    <p>Actualmente ningún usuario ha solicitado ayuda o tiene un chat activo.</p>
+                                    <h2 className="text-2xl font-bold mb-2">Sin tareas pendientes</h2>
+                                    <p>No hay solicitudes nuevas ni tienes chats activos asignados.</p>
                                 </div>
                             </div>
                         ) : (
@@ -415,11 +500,11 @@
                                             <div className={`absolute top-0 right-0 px-4 py-1 text-xs font-bold text-white rounded-bl-lg ${
                                                 request.status === 'pending' ? 'bg-yellow-500' : 'bg-green-600'
                                             }`}>
-                                                {request.status === 'pending' ? 'Solicitud Pendiente' : 'Chat Activo'}
+                                                {request.status === 'pending' ? 'Solicitud Pendiente' : 'Chat Activo (Tú)'}
                                             </div>
 
                                             <div className="bg-gray-50 p-4 border-b border-gray-200">
-                                                <h3 className="text-lg font-bold text-gray-800">Usuario ID: {client.id} <span className="font-normal text-sm text-gray-500">({client.email})</span></h3>
+                                                <h3 className="text-lg font-bold text-gray-800">Chat ID: {request.id} <span className="font-normal text-sm text-gray-500">| Cliente: {client.email}</span></h3>
                                                 {/* Mostrar Comentario del Usuario */}
                                                 {request.comment && (
                                                     <div className="mt-2 bg-yellow-50 p-3 rounded border border-yellow-100 text-sm italic text-gray-700">
@@ -441,13 +526,13 @@
                                                     
                                                     {request.status === 'pending' ? (
                                                         <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6">
-                                                            <p className="text-sm text-gray-500 mb-4 text-center">El usuario está esperando respuesta.</p>
+                                                            <p className="text-sm text-gray-500 mb-4 text-center">El usuario está esperando. Al aceptar, serás el único admin en este chat.</p>
                                                             <button 
                                                                 onClick={() => onStartChat(request.id)}
                                                                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full shadow transition flex items-center gap-2"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                                                                Iniciar Chat de Ayuda
+                                                                Tomar Caso e Iniciar Chat
                                                             </button>
                                                         </div>
                                                     ) : (
@@ -509,11 +594,6 @@
                 </ul>
             );
         }
-        
-        // El resto de componentes (EntryForm, SmartWeeklyReport, IntensityChart, ClientReportDashboard, SettingsDashboard) 
-        // se mantienen igual que en la versión anterior para no sobrecargar el código, 
-        // pero se asume que están definidos correctamente. 
-        // A continuación, solo incluiremos EntryForm para mantener la coherencia.
         
         function EntryForm({ onAddEntry, emotionsList, habitsList, onAddEmotion, onAddHabit }) {
             const [level, setLevel] = React.useState(5);
@@ -632,9 +712,7 @@
             );
         }
         
-        // Incluimos los demás componentes necesarios para que el código compile
-        
-        // COMPONENTE SmartWeeklyReport (Mantenido de la versión anterior)
+        // COMPONENTE SmartWeeklyReport (Mantenido)
         function SmartWeeklyReport({ entries }) {
             const [currentDate, setCurrentDate] = React.useState(new Date());
 
@@ -806,7 +884,7 @@
             );
         }
         
-        // COMPONENTE IntensityChart (Mantenido de la versión anterior)
+        // COMPONENTE IntensityChart (Mantenido)
         function IntensityChart({ entries }) {
             if (!entries || entries.length === 0) return null;
 
@@ -852,9 +930,8 @@
             );
         }
 
-        // COMPONENTE ClientReportDashboard (Mantenido de la versión anterior)
+        // COMPONENTE ClientReportDashboard (Mantenido)
         function ClientReportDashboard({ entries, myAdvices }) {
-            // El componente SmartWeeklyReport y IntensityChart deben estar definidos
             return (
                 <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-8">
                     {/* Header Consejos */}
@@ -890,11 +967,17 @@
             );
         }
 
-        // COMPONENTE HelpRequestView (Mantenido de la versión anterior)
-        function HelpRequestView({ currentUser, helpRequests, chats, onRequestHelp, onSendMessage }) {
+        // COMPONENTE HelpRequestView (Mantenido y Actualizado para mostrar nombre del profesional)
+        function HelpRequestView({ currentUser, helpRequests, chats, onRequestHelp, onSendMessage, users }) {
             // Buscar si ya tiene una solicitud activa o pendiente
             const myRequest = helpRequests.find(r => r.userId === currentUser.id && r.status !== 'closed');
             const [comment, setComment] = React.useState('');
+
+            // Buscar el profesional asignado si la solicitud es activa
+            let assignedProfessional = null;
+            if (myRequest && myRequest.status === 'active' && myRequest.adminId) {
+                assignedProfessional = users.find(u => u.id === myRequest.adminId);
+            }
 
             const handleSubmitRequest = (e) => {
                 e.preventDefault();
@@ -924,12 +1007,12 @@
                                         onChange={e => setComment(e.target.value)}
                                     ></textarea>
                                 </div>
-<div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3">
-                                <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <p className="text-xs text-blue-800">
-                                    Al enviar esta solicitud, permitirás que el profesional vea tu historial emocional para brindarte una mejor asistencia.
-                                </p>
-                            </div>
+                                <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3">
+                                    <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <p className="text-xs text-blue-800">
+                                        Al enviar esta solicitud, permitirás que el profesional vea tu historial emocional para brindarte una mejor asistencia.
+                                    </p>
+                                </div>
                                 <button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 rounded-lg transition shadow-md">
                                     Solicitar Ayuda
                                 </button>
@@ -956,12 +1039,16 @@
 
                             {myRequest.status === 'active' && (
                                 <div className="space-y-4">
-                                    <div className="bg-green-50 border border-green-200 p-4 rounded-xl flex items-center justify-between">
+                                    <div className="bg-green-50 border border-green-200 p-4 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
                                         <div className="flex items-center gap-3">
                                             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                                            <span className="font-bold text-green-800">Conectado con Profesional</span>
+                                            <div>
+                                                <span className="font-bold text-green-800 block">Conectado con Profesional</span>
+                                                <span className="text-xs text-green-700">
+                                                    Atendido por: <strong>{assignedProfessional ? assignedProfessional.email : 'Especialista'}</strong>
+                                                </span>
+                                            </div>
                                         </div>
-                                        {/* Cliente solo puede ver que está activo, el cierre lo maneja el admin */}
                                     </div>
                                     <ChatWindow 
                                         requestId={myRequest.id} 
@@ -970,6 +1057,7 @@
                                         onSendMessage={onSendMessage}
                                         isAdmin={false} // Cliente no puede cerrar
                                         onCloseChat={() => {}} 
+                                        professionalName={assignedProfessional ? assignedProfessional.email : 'Especialista'}
                                     />
                                 </div>
                             )}
@@ -979,7 +1067,7 @@
             );
         }
 
-        // COMPONENTE SettingsDashboard (Mantenido de la versión anterior)
+        // COMPONENTE SettingsDashboard (Mantenido)
         function SettingsDashboard({ emotionsList, habitsList, onRemoveEmotion, onRemoveHabit }) {
             const DEFAULT_EMOTIONS = ["Estrés", "Ansiedad", "Frustración", "Calma", "Alegría", "Tristeza"]; // Se debe redefinir si se usa en el componente
             const DEFAULT_HABITS = ["Ejercicio", "Trabajo", "Descanso", "Socializar", "Meditar", "Comer"]; // Se debe redefinir si se usa en el componente
@@ -1119,25 +1207,40 @@
             
             const handleRequestHelp = (userId, comment) => {
                 const newRequest = {
-                    id: Date.now(), // Request ID sirve como Chat Room ID
+                    id: Date.now(), // ID ÚNICO DEL CHAT
                     userId: userId,
+                    adminId: null, // Aún nadie lo toma
                     status: 'pending', // pending, active, closed
                     comment: comment,
-                    timestamp: Date.now()
+                    timestamp: Date.now(), // Fecha creación
+                    startTime: null,
+                    endTime: null
                 };
                 setHelpRequests(prev => [...prev, newRequest]);
             };
 
+            // MODIFICADO: Al iniciar, asignamos al admin actual y guardamos hora de inicio
             const handleStartChat = (requestId) => {
+                if (!currentUser || currentUser.type !== 0) return;
+                
                 setHelpRequests(prev => prev.map(req => 
-                    req.id === requestId ? { ...req, status: 'active' } : req
+                    req.id === requestId ? { 
+                        ...req, 
+                        status: 'active', 
+                        adminId: currentUser.id, // Asignamos ESTE admin
+                        startTime: Date.now()    // Fecha de inicio real
+                    } : req
                 ));
             };
 
-            // NUEVA FUNCIÓN: Cerrar Chat y Archivar
+            // MODIFICADO: Al cerrar, guardamos hora de cierre
             const handleCloseChat = (requestId) => {
                 setHelpRequests(prev => prev.map(req => 
-                    req.id === requestId ? { ...req, status: 'closed', timestamp: Date.now() } : req // Actualizar timestamp para orden
+                    req.id === requestId ? { 
+                        ...req, 
+                        status: 'closed', 
+                        endTime: Date.now()      // Fecha de cierre
+                    } : req 
                 ));
             };
 
@@ -1202,6 +1305,7 @@
                                 chats={chats}
                                 onRequestHelp={handleRequestHelp}
                                 onSendMessage={handleSendMessage}
+                                users={users} // Pasamos usuarios para buscar nombre del profesional
                             />
                         )}
                         {currentUser.type === 1 && currentView === 'settings' && (
@@ -1233,4 +1337,3 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
-    
