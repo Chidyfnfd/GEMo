@@ -1,7 +1,8 @@
-**Sitio web**
+**Sitio web:**
 https://gemo-gestor-emocional.netlify.app
 
 🌟 **Descripción del Proyecto**
+
 GEMo (Gestor Emocional) es una aplicación web de una sola página (SPA) diseñada para el registro y seguimiento del estado emocional de los usuarios, con un componente de Ayuda Profesional a través de un chat en vivo.
 
 El sistema soporta dos perfiles de usuario principales:
@@ -12,6 +13,7 @@ El sistema soporta dos perfiles de usuario principales:
 
 
 ⚙️ **Tecnologías Utilizadas**
+
 La aplicación está construida como un prototipo de frontend puro utilizando tecnologías web estándar y CDN (Content Delivery Network) para simplificar la configuración.
 
 - React (Biblioteca JS): Utilizada para construir la interfaz de usuario (UI) mediante componentes modulares (AuthScreen, Header, AdminDashboard, etc.) y gestionar el estado de la aplicación.
@@ -30,6 +32,7 @@ La aplicación está construida como un prototipo de frontend puro utilizando te
 
 
 🔑 **Credenciales de Cuentas de Prueba**
+
 La aplicación utiliza un arreglo de usuarios iniciales (INITIAL_USERS) almacenado en el código para simular la autenticación.
 
 **Contraseña Común:** Todas las cuentas de prueba utilizan la **contraseña: 123**
